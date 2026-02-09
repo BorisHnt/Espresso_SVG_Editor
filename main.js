@@ -84,6 +84,7 @@ new CanvasSettingsPanel({
 setupExporters({
   eventBus,
   getMarkup: () => engine.serializeDocument({ pretty: true, inlineStyle: store.getState().inlineStyle }),
+  getExportFileName: () => store.getState().exportFileName,
 });
 
 setupImporters({

@@ -8,6 +8,7 @@ export class ToolsPanel {
 
     this.toolButtons = Array.from(root.querySelectorAll(".tool-btn"));
     this.themeToggle = document.getElementById("themeToggle");
+    this.exportFileNameInput = document.getElementById("exportFileNameInput");
 
     this.bind();
     this.decorate();
@@ -48,6 +49,15 @@ export class ToolsPanel {
       const nextTheme = this.store.getState().theme === "latte" ? "ristretto" : "latte";
       this.store.set({ theme: nextTheme });
     });
+
+    if (this.exportFileNameInput) {
+      const pushExportFileName = () => {
+        const next = this.exportFileNameInput.value.trim();
+        this.store.set({ exportFileName: next || "espresso" });
+      };
+      this.exportFileNameInput.addEventListener("change", pushExportFileName);
+      this.exportFileNameInput.addEventListener("blur", pushExportFileName);
+    }
 
     document.getElementById("zoomInBtn").addEventListener("click", () => this.eventBus.emit("view:zoom-in"));
     document.getElementById("zoomOutBtn").addEventListener("click", () => this.eventBus.emit("view:zoom-out"));
@@ -141,6 +151,13 @@ export class ToolsPanel {
 
   applyState(state) {
     document.body.dataset.theme = state.theme;
+    if (this.exportFileNameInput && document.activeElement !== this.exportFileNameInput) {
+      const value = state.exportFileName || "espresso";
+      if (this.exportFileNameInput.value !== value) {
+        this.exportFileNameInput.value = value;
+      }
+    }
+
     decorateButton(
       this.themeToggle,
       state.theme === "latte" ? ACTION_ICON_MAP.themeLatte : ACTION_ICON_MAP.themeRistretto,

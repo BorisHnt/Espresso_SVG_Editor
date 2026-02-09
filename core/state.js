@@ -41,6 +41,7 @@ const defaultState = {
   snapEnabled: true,
   zoom: 1,
   inlineStyle: false,
+  exportFileName: "espresso",
   canvas: createDefaultCanvasConfig(),
   canvasUserPresets: [],
 };

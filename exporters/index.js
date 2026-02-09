@@ -38,21 +38,35 @@ async function svgMarkupToRaster(markup, mimeType = "image/png", quality = 0.92)
   return blob;
 }
 
-export function setupExporters({ eventBus, getMarkup }) {
+function sanitizeBaseName(value) {
+  const raw = String(value || "")
+    .trim()
+    .replace(/\.[a-z0-9]+$/i, "");
+  const cleaned = raw
+    .replace(/[<>:"/\\|?*\u0000-\u001F]+/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[. ]+$/g, "");
+  return cleaned || "espresso";
+}
+
+export function setupExporters({ eventBus, getMarkup, getExportFileName }) {
+  const resolveName = (extension) => `${sanitizeBaseName(getExportFileName?.())}.${extension}`;
+
   document.getElementById("exportSvgBtn").addEventListener("click", async () => {
     const raw = getMarkup();
     const optimized = await optimizeMarkup(raw);
-    downloadBlob(new Blob([optimized], { type: "image/svg+xml" }), "espresso.svg");
+    downloadBlob(new Blob([optimized], { type: "image/svg+xml" }), resolveName("svg"));
   });
 
   document.getElementById("exportPngBtn").addEventListener("click", async () => {
     const blob = await svgMarkupToRaster(getMarkup(), "image/png");
-    downloadBlob(blob, "espresso.png");
+    downloadBlob(blob, resolveName("png"));
   });
 
   document.getElementById("exportJpgBtn").addEventListener("click", async () => {
     const blob = await svgMarkupToRaster(getMarkup(), "image/jpeg");
-    downloadBlob(blob, "espresso.jpg");
+    downloadBlob(blob, resolveName("jpg"));
   });
 
   eventBus.on("export:svg-optimized", async ({ markup, filename = "optimized.svg" }) => {
