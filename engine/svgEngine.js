@@ -61,11 +61,12 @@ function parseSvgString(source) {
 }
 
 export class SvgEngine {
-  constructor({ svg, scene, defs, viewport, selectionOutline, eventBus, store, history }) {
+  constructor({ svg, scene, defs, viewport, selectionOutline, pathEditorLayer = null, eventBus, store, history }) {
     this.svg = svg;
     this.scene = scene;
     this.defs = defs;
     this.viewport = viewport;
+    this.pathEditorLayer = pathEditorLayer;
     this.eventBus = eventBus;
     this.store = store;
     this.history = history;
@@ -98,8 +99,12 @@ export class SvgEngine {
   #bindEvents() {
     this.svg.addEventListener("pointerdown", (event) => this.onPointerDown(event));
     this.svg.addEventListener("dblclick", (event) => this.onDoubleClick(event));
+    if (this.pathEditorLayer) {
+      this.pathEditorLayer.addEventListener("pointerdown", (event) => this.onPathOverlayPointerDown(event));
+    }
     window.addEventListener("pointermove", (event) => this.onPointerMove(event));
     window.addEventListener("pointerup", (event) => this.onPointerUp(event));
+    window.addEventListener("pointercancel", (event) => this.onPointerUp(event));
     window.addEventListener("keydown", (event) => this.onWindowKeyDown(event));
     this.viewport.addEventListener("wheel", (event) => this.onWheel(event), { passive: false });
 
@@ -108,6 +113,7 @@ export class SvgEngine {
         this.finalizePathSession({ close: false });
       }
       this.currentTool = tool;
+      this.renderPathEditorOverlay();
     });
 
     this.eventBus.on("selection:by-id", ({ id }) => {
@@ -131,6 +137,10 @@ export class SvgEngine {
     this.eventBus.on("view:zoom-fit", () => this.fitToCanvas());
     this.eventBus.on("canvas:apply-config", ({ config, source = "canvas-settings", recordHistory = true }) => {
       this.applyCanvasConfig(config, { source, recordHistory });
+    });
+
+    this.eventBus.on("canvas:viewbox:changed", () => {
+      this.renderPathEditorOverlay();
     });
 
     this.eventBus.on("image:insert", ({ dataUrl, x = 120, y = 120, width = 240, height = 180 }) => {
@@ -253,6 +263,7 @@ export class SvgEngine {
 
   importSvgRoot(root) {
     this.pathSession = null;
+    this.clearPathEditorOverlay();
     this.scene.innerHTML = "";
     const incomingDefs = root.querySelector("defs");
     this.defs.innerHTML = incomingDefs ? incomingDefs.innerHTML : "";
@@ -446,7 +457,12 @@ export class SvgEngine {
   }
 
   onPointerMove(event) {
-    if (this.currentTool === "path" && this.pathSession && (!this.pointerAction || this.pointerAction.type !== "pan")) {
+    if (this.pointerAction?.type?.startsWith("path-")) {
+      this.onPathPointerMove(event);
+      return;
+    }
+
+    if (this.currentTool === "path" && this.pathSession && !this.pointerAction) {
       const rawPoint = this.clientToSvg(event.clientX, event.clientY);
       const canvasConfig = this.getCanvasConfig();
       const snapEnabled = canvasConfig.grid?.snap ?? this.store.getState().snapEnabled;
@@ -512,6 +528,12 @@ export class SvgEngine {
       return;
     }
 
+    if (this.pointerAction.type.startsWith("path-")) {
+      this.pointerAction = null;
+      this.renderPathSession();
+      return;
+    }
+
     if (this.pointerAction.type === "draw") {
       const { element, before } = this.pointerAction;
       if (!this.hasVisibleSize(element)) {
@@ -549,6 +571,8 @@ export class SvgEngine {
       return;
     }
 
+    const key = event.key.toLowerCase();
+
     if (event.key === "Escape") {
       event.preventDefault();
       this.finalizePathSession({ cancel: true });
@@ -558,10 +582,24 @@ export class SvgEngine {
     if (event.key === "Enter") {
       event.preventDefault();
       this.finalizePathSession({ close: event.shiftKey });
+      return;
+    }
+
+    if (event.key === "Backspace") {
+      event.preventDefault();
+      this.removeLastPathAnchor();
+      return;
+    }
+
+    if (key === "c" && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault();
+      this.toggleActiveAnchorCurve();
     }
   }
 
   handlePathPointerDown(point, event) {
+    const snappedPoint = this.normalizePoint(point);
+
     if (!this.pathSession) {
       const before = this.snapshot();
       const path = document.createElementNS(SVG_NS, "path");
@@ -571,50 +609,82 @@ export class SvgEngine {
       path.setAttribute("stroke-width", "2");
       path.setAttribute("stroke-linecap", "round");
       path.setAttribute("stroke-linejoin", "round");
-      path.setAttribute("d", `M ${point.x} ${point.y}`);
       this.scene.append(path);
       this.selection.select(path);
 
       this.pathSession = {
         element: path,
-        points: [point],
+        anchors: [
+          {
+            x: snappedPoint.x,
+            y: snappedPoint.y,
+            in: null,
+            out: null,
+            mode: "corner",
+          },
+        ],
         preview: null,
         before,
+        activeAnchorIndex: 0,
       };
+      this.pointerAction = {
+        type: "path-create-handle",
+        anchorIndex: 0,
+      };
+      this.renderPathSession();
       return;
     }
 
     const session = this.pathSession;
-    const last = session.points[session.points.length - 1];
-    let nextPoint = point;
+    const last = session.anchors[session.anchors.length - 1];
+    let nextPoint = snappedPoint;
 
     if (event.shiftKey && last) {
-      const dx = Math.abs(point.x - last.x);
-      const dy = Math.abs(point.y - last.y);
-      nextPoint = dx >= dy ? { x: point.x, y: last.y } : { x: last.x, y: point.y };
+      const dx = Math.abs(snappedPoint.x - last.x);
+      const dy = Math.abs(snappedPoint.y - last.y);
+      nextPoint = dx >= dy
+        ? { x: snappedPoint.x, y: last.y }
+        : { x: last.x, y: snappedPoint.y };
     }
 
-    const first = session.points[0];
+    const first = session.anchors[0];
     const canvasConfig = this.getCanvasConfig();
     const closeThreshold = Math.max(6, canvasConfig.grid?.spacing ?? 10);
-    if (session.points.length >= 3 && Math.hypot(nextPoint.x - first.x, nextPoint.y - first.y) <= closeThreshold) {
+    if (
+      session.anchors.length >= 3
+      && Math.hypot(nextPoint.x - first.x, nextPoint.y - first.y) <= closeThreshold
+    ) {
       this.finalizePathSession({ close: true });
       return;
     }
 
-    session.points.push(nextPoint);
+    session.anchors.push({
+      x: nextPoint.x,
+      y: nextPoint.y,
+      in: null,
+      out: null,
+      mode: "corner",
+    });
+    session.activeAnchorIndex = session.anchors.length - 1;
     session.preview = null;
+    this.pointerAction = {
+      type: "path-create-handle",
+      anchorIndex: session.activeAnchorIndex,
+    };
     this.renderPathSession();
   }
 
   renderPathSession() {
     if (!this.pathSession) {
+      this.clearPathEditorOverlay();
       return;
     }
-    const { element, points, preview } = this.pathSession;
-    const drawPoints = preview ? [...points, preview] : points;
-    const simplified = this.pathEditor.simplify(drawPoints, 0.6);
-    element.setAttribute("d", this.pathEditor.toPathData(simplified, false));
+    const { element, anchors, preview } = this.pathSession;
+    const drawAnchors = preview
+      ? [...anchors, { x: preview.x, y: preview.y, in: null, out: null, mode: "corner" }]
+      : anchors;
+    element.setAttribute("d", this.pathEditor.anchorsToPathData(drawAnchors, false));
+    this.renderPathEditorOverlay();
     this.selection.refreshOutline();
   }
 
@@ -623,22 +693,361 @@ export class SvgEngine {
       return;
     }
 
-    const { element, points, before } = this.pathSession;
+    const { element, anchors, before } = this.pathSession;
 
-    if (cancel || points.length < 2) {
+    if (cancel || anchors.length < 2) {
       element.remove();
       this.pathSession = null;
+      this.pointerAction = null;
+      this.clearPathEditorOverlay();
       this.selection.clear();
       this.emitSceneChanged("canvas");
       return;
     }
 
-    const simplified = this.pathEditor.simplify(points, 0.6);
-    element.setAttribute("d", this.pathEditor.toPathData(simplified, close));
+    const normalizedAnchors = anchors.map((anchor) => ({
+      x: anchor.x,
+      y: anchor.y,
+      in: anchor.in ? this.normalizePoint(anchor.in) : null,
+      out: anchor.out ? this.normalizePoint(anchor.out) : null,
+      mode: anchor.mode || "corner",
+    }));
+
+    element.setAttribute("d", this.pathEditor.anchorsToPathData(normalizedAnchors, close));
     this.pathSession = null;
+    this.pointerAction = null;
+    this.clearPathEditorOverlay();
 
     this.pushSnapshotHistory("Draw path", before);
     this.emitSceneChanged("canvas");
+  }
+
+  onPathOverlayPointerDown(event) {
+    if (this.currentTool !== "path" || !this.pathSession) {
+      return;
+    }
+
+    const target = event.target.closest("[data-path-role]");
+    if (!(target instanceof SVGElement)) {
+      return;
+    }
+
+    const index = Number.parseInt(target.dataset.index || "", 10);
+    if (!Number.isFinite(index)) {
+      return;
+    }
+
+    const session = this.pathSession;
+    const anchor = session.anchors[index];
+    if (!anchor) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    session.activeAnchorIndex = index;
+    session.preview = null;
+
+    const role = target.dataset.pathRole;
+    if (role === "anchor") {
+      this.pointerAction = {
+        type: "path-move-anchor",
+        index,
+        startPoint: this.clientToSvg(event.clientX, event.clientY),
+        original: {
+          x: anchor.x,
+          y: anchor.y,
+          in: anchor.in ? { ...anchor.in } : null,
+          out: anchor.out ? { ...anchor.out } : null,
+          mode: anchor.mode || "corner",
+        },
+      };
+      this.renderPathSession();
+      return;
+    }
+
+    if (role === "handle") {
+      const side = target.dataset.side === "in" ? "in" : "out";
+      this.pointerAction = {
+        type: "path-move-handle",
+        index,
+        side,
+      };
+      this.onPathPointerMove(event);
+      return;
+    }
+
+    this.renderPathSession();
+  }
+
+  onPathPointerMove(event) {
+    if (!this.pathSession || !this.pointerAction) {
+      return;
+    }
+
+    const session = this.pathSession;
+    const action = this.pointerAction;
+
+    if (action.type === "path-create-handle") {
+      const anchor = session.anchors[action.anchorIndex];
+      if (!anchor) {
+        return;
+      }
+
+      const handle = this.normalizePoint(this.clientToSvg(event.clientX, event.clientY));
+      const dx = handle.x - anchor.x;
+      const dy = handle.y - anchor.y;
+      const distance = Math.hypot(dx, dy);
+
+      if (distance < 1.2) {
+        anchor.in = null;
+        anchor.out = null;
+        anchor.mode = "corner";
+      } else {
+        anchor.out = handle;
+        if (event.altKey) {
+          anchor.in = null;
+          anchor.mode = "corner";
+        } else {
+          anchor.in = this.normalizePoint({
+            x: anchor.x - dx,
+            y: anchor.y - dy,
+          });
+          anchor.mode = "smooth";
+        }
+      }
+
+      session.activeAnchorIndex = action.anchorIndex;
+      this.renderPathSession();
+      return;
+    }
+
+    if (action.type === "path-move-anchor") {
+      const anchor = session.anchors[action.index];
+      if (!anchor) {
+        return;
+      }
+
+      const rawPoint = this.clientToSvg(event.clientX, event.clientY);
+      const canvasConfig = this.getCanvasConfig();
+      const snapEnabled = canvasConfig.grid?.snap ?? this.store.getState().snapEnabled;
+      const spacing = canvasConfig.grid?.spacing ?? 10;
+      const snapped = snapPoint(rawPoint, spacing, snapEnabled);
+
+      const dx = snapped.x - action.startPoint.x;
+      const dy = snapped.y - action.startPoint.y;
+      anchor.x = Number((action.original.x + dx).toFixed(2));
+      anchor.y = Number((action.original.y + dy).toFixed(2));
+      anchor.mode = action.original.mode || "corner";
+
+      anchor.in = action.original.in
+        ? {
+          x: Number((action.original.in.x + dx).toFixed(2)),
+          y: Number((action.original.in.y + dy).toFixed(2)),
+        }
+        : null;
+      anchor.out = action.original.out
+        ? {
+          x: Number((action.original.out.x + dx).toFixed(2)),
+          y: Number((action.original.out.y + dy).toFixed(2)),
+        }
+        : null;
+
+      session.activeAnchorIndex = action.index;
+      this.renderPathSession();
+      return;
+    }
+
+    if (action.type === "path-move-handle") {
+      const anchor = session.anchors[action.index];
+      if (!anchor) {
+        return;
+      }
+
+      const handle = this.normalizePoint(this.clientToSvg(event.clientX, event.clientY));
+      anchor[action.side] = handle;
+
+      if (event.shiftKey) {
+        anchor.mode = "smooth";
+      }
+      if (event.altKey) {
+        anchor.mode = "corner";
+      }
+
+      if (anchor.mode === "smooth" && !event.altKey) {
+        const opposite = action.side === "in" ? "out" : "in";
+        const dx = handle.x - anchor.x;
+        const dy = handle.y - anchor.y;
+        anchor[opposite] = this.normalizePoint({
+          x: anchor.x - dx,
+          y: anchor.y - dy,
+        });
+      }
+
+      if (!anchor.in && !anchor.out) {
+        anchor.mode = "corner";
+      }
+
+      session.activeAnchorIndex = action.index;
+      this.renderPathSession();
+    }
+  }
+
+  removeLastPathAnchor() {
+    if (!this.pathSession) {
+      return;
+    }
+    if (this.pathSession.anchors.length <= 1) {
+      this.finalizePathSession({ cancel: true });
+      return;
+    }
+    this.pathSession.anchors.pop();
+    this.pathSession.activeAnchorIndex = Math.max(0, this.pathSession.anchors.length - 1);
+    this.pathSession.preview = null;
+    this.pointerAction = null;
+    this.renderPathSession();
+  }
+
+  toggleActiveAnchorCurve() {
+    if (!this.pathSession || !this.pathSession.anchors.length) {
+      return;
+    }
+
+    const anchors = this.pathSession.anchors;
+    const index = Number.isInteger(this.pathSession.activeAnchorIndex)
+      ? this.pathSession.activeAnchorIndex
+      : anchors.length - 1;
+    const anchor = anchors[index];
+    if (!anchor) {
+      return;
+    }
+
+    if (anchor.in || anchor.out) {
+      anchor.in = null;
+      anchor.out = null;
+      anchor.mode = "corner";
+      this.renderPathSession();
+      return;
+    }
+
+    const direction = this.getAnchorDirection(anchors, index);
+    const prev = anchors[index - 1];
+    const next = anchors[index + 1];
+    const prevDistance = prev ? Math.hypot(anchor.x - prev.x, anchor.y - prev.y) : 0;
+    const nextDistance = next ? Math.hypot(next.x - anchor.x, next.y - anchor.y) : 0;
+    const baseDistance = Math.max(prevDistance, nextDistance, 24);
+    const handleLength = Math.min(120, Math.max(12, baseDistance / 3));
+
+    anchor.out = this.normalizePoint({
+      x: anchor.x + direction.x * handleLength,
+      y: anchor.y + direction.y * handleLength,
+    });
+    anchor.in = this.normalizePoint({
+      x: anchor.x - direction.x * handleLength,
+      y: anchor.y - direction.y * handleLength,
+    });
+    anchor.mode = "smooth";
+    this.renderPathSession();
+  }
+
+  getAnchorDirection(anchors, index) {
+    const anchor = anchors[index];
+    const prev = anchors[index - 1];
+    const next = anchors[index + 1];
+
+    let dx = 1;
+    let dy = 0;
+
+    if (prev && next) {
+      dx = next.x - prev.x;
+      dy = next.y - prev.y;
+    } else if (prev) {
+      dx = anchor.x - prev.x;
+      dy = anchor.y - prev.y;
+    } else if (next) {
+      dx = next.x - anchor.x;
+      dy = next.y - anchor.y;
+    }
+
+    const length = Math.hypot(dx, dy) || 1;
+    return {
+      x: dx / length,
+      y: dy / length,
+    };
+  }
+
+  renderPathEditorOverlay() {
+    if (!this.pathEditorLayer) {
+      return;
+    }
+
+    this.pathEditorLayer.innerHTML = "";
+
+    if (!this.pathSession || this.currentTool !== "path") {
+      return;
+    }
+
+    const viewBox = this.getViewBoxObject();
+    const ratio = viewBox.width / Math.max(this.viewport.clientWidth, 1);
+    const anchorRadius = Math.max(5 * ratio, 2.4);
+    const handleRadius = Math.max(3.8 * ratio, 1.9);
+
+    const appendHandle = (point, index, side) => {
+      const anchor = this.pathSession.anchors[index];
+      const line = document.createElementNS(SVG_NS, "line");
+      line.setAttribute("x1", anchor.x);
+      line.setAttribute("y1", anchor.y);
+      line.setAttribute("x2", point.x);
+      line.setAttribute("y2", point.y);
+      line.setAttribute("class", "path-handle-link");
+      this.pathEditorLayer.append(line);
+
+      const handle = document.createElementNS(SVG_NS, "circle");
+      handle.setAttribute("cx", point.x);
+      handle.setAttribute("cy", point.y);
+      handle.setAttribute("r", handleRadius);
+      handle.setAttribute("class", "path-handle");
+      handle.dataset.pathRole = "handle";
+      handle.dataset.index = String(index);
+      handle.dataset.side = side;
+      this.pathEditorLayer.append(handle);
+    };
+
+    this.pathSession.anchors.forEach((anchor, index) => {
+      if (anchor.in) {
+        appendHandle(anchor.in, index, "in");
+      }
+      if (anchor.out) {
+        appendHandle(anchor.out, index, "out");
+      }
+    });
+
+    this.pathSession.anchors.forEach((anchor, index) => {
+      const node = document.createElementNS(SVG_NS, "circle");
+      node.setAttribute("cx", anchor.x);
+      node.setAttribute("cy", anchor.y);
+      node.setAttribute("r", anchorRadius);
+      node.setAttribute(
+        "class",
+        `path-anchor${index === this.pathSession.activeAnchorIndex ? " is-active" : ""}${index === 0 ? " is-start" : ""}`,
+      );
+      node.dataset.pathRole = "anchor";
+      node.dataset.index = String(index);
+      this.pathEditorLayer.append(node);
+    });
+  }
+
+  clearPathEditorOverlay() {
+    if (this.pathEditorLayer) {
+      this.pathEditorLayer.innerHTML = "";
+    }
+  }
+
+  normalizePoint(point) {
+    return {
+      x: Number(point.x.toFixed(2)),
+      y: Number(point.y.toFixed(2)),
+    };
   }
 
   resetDocument() {
@@ -1013,6 +1422,8 @@ export class SvgEngine {
   }
 
   restoreSnapshot(snapshot, source = "history") {
+    this.pathSession = null;
+    this.clearPathEditorOverlay();
     this.scene.innerHTML = snapshot.scene || "";
     this.defs.innerHTML = snapshot.defs || "";
     if (snapshot.viewBox) {

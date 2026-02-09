@@ -29,14 +29,40 @@ export class CodeEditorPanel {
 
     this.activeId = null;
     this.suspendSceneEcho = false;
+    this.isFocused = false;
+    this.localDirty = false;
+    this.pendingExternalMarkup = null;
+    this.lastDispatchedCode = "";
+    this.lastSyncedMarkup = "";
 
-    this.applyDebounced = debounce(() => this.applyCode(), 240);
+    this.applyDebounced = debounce(() => this.applyCode({ recordHistory: false }), 120);
 
     this.bind();
   }
 
   bind() {
+    this.textarea.addEventListener("focus", () => {
+      this.isFocused = true;
+    });
+
+    this.textarea.addEventListener("blur", () => {
+      this.isFocused = false;
+
+      if (this.localDirty) {
+        this.applyCode({ recordHistory: true, force: true });
+        return;
+      }
+
+      if (this.pendingExternalMarkup && this.pendingExternalMarkup !== this.textarea.value) {
+        this.textarea.value = this.pendingExternalMarkup;
+        this.pendingExternalMarkup = null;
+        this.lastSyncedMarkup = this.textarea.value;
+        this.renderHighlight();
+      }
+    });
+
     this.textarea.addEventListener("input", () => {
+      this.localDirty = true;
       this.renderHighlight();
       this.applyDebounced();
     });
@@ -52,7 +78,13 @@ export class CodeEditorPanel {
         const start = this.textarea.selectionStart;
         const end = this.textarea.selectionEnd;
         this.textarea.setRangeText("  ", start, end, "end");
+        this.localDirty = true;
         this.renderHighlight();
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "enter") {
+        event.preventDefault();
+        this.applyCode({ recordHistory: true, force: true });
       }
     });
 
@@ -61,10 +93,29 @@ export class CodeEditorPanel {
 
     this.eventBus.on("scene:changed", ({ source, markup, selectedId }) => {
       this.activeId = selectedId;
-      if (!this.suspendSceneEcho || source !== "code") {
-        this.textarea.value = markup;
+
+      if (source === "code" && this.suspendSceneEcho) {
+        this.lastSyncedMarkup = markup;
+        this.localDirty = false;
+        this.pendingExternalMarkup = null;
+        this.suspendSceneEcho = false;
+        this.setStatus(`ok (${source})`, false);
         this.renderHighlight();
+        return;
       }
+
+      if (this.isFocused) {
+        this.pendingExternalMarkup = markup;
+        this.suspendSceneEcho = false;
+        this.setStatus("edit local actif", false);
+        return;
+      }
+
+      this.textarea.value = markup;
+      this.lastSyncedMarkup = markup;
+      this.localDirty = false;
+      this.pendingExternalMarkup = null;
+      this.renderHighlight();
       this.suspendSceneEcho = false;
       this.setStatus(`ok (${source})`, false);
     });
@@ -87,16 +138,18 @@ export class CodeEditorPanel {
 
     document.getElementById("prettyBtn").addEventListener("click", () => {
       this.textarea.value = formatXml(this.textarea.value);
+      this.localDirty = true;
       this.renderHighlight();
-      this.applyCode();
+      this.applyCode({ recordHistory: true, force: true });
     });
 
     document.getElementById("minifyBtn").addEventListener("click", async () => {
       this.setStatus("optimizing...", false);
       const minified = await this.optimizeMarkup(this.textarea.value);
       this.textarea.value = minified;
+      this.localDirty = true;
       this.renderHighlight();
-      this.applyCode();
+      this.applyCode({ recordHistory: true, force: true });
     });
 
     document.getElementById("inlineStyleBtn").addEventListener("click", () => {
@@ -139,12 +192,18 @@ export class CodeEditorPanel {
     }
   }
 
-  applyCode() {
+  applyCode({ recordHistory = false, force = false } = {}) {
+    const code = this.textarea.value;
+    if (!force && code === this.lastDispatchedCode) {
+      return;
+    }
+
+    this.lastDispatchedCode = code;
     this.suspendSceneEcho = true;
     this.setStatus("parsing...", false);
     this.eventBus.emit("scene:load-code", {
-      code: this.textarea.value,
-      recordHistory: true,
+      code,
+      recordHistory,
     });
   }
 

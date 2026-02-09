@@ -31,10 +31,45 @@ export class PathEditor {
     return commands.join(" ");
   }
 
+  anchorsToPathData(anchors, closed = false) {
+    if (!anchors.length) {
+      return "";
+    }
+
+    const commands = [`M ${anchors[0].x} ${anchors[0].y}`];
+    for (let i = 1; i < anchors.length; i += 1) {
+      const previous = anchors[i - 1];
+      const current = anchors[i];
+      commands.push(this.#segmentCommand(previous, current));
+    }
+
+    if (closed && anchors.length > 1) {
+      const last = anchors[anchors.length - 1];
+      const first = anchors[0];
+      commands.push(this.#segmentCommand(last, first));
+      commands.push("Z");
+    }
+
+    return commands.join(" ");
+  }
+
   closePath(element) {
     const d = element.getAttribute("d") || "";
     if (!d.trim().endsWith("Z")) {
       element.setAttribute("d", `${d} Z`.trim());
     }
+  }
+
+  #segmentCommand(from, to) {
+    const hasCurve = Boolean(from.out || to.in);
+    if (!hasCurve) {
+      return `L ${to.x} ${to.y}`;
+    }
+
+    const c1x = from.out?.x ?? from.x;
+    const c1y = from.out?.y ?? from.y;
+    const c2x = to.in?.x ?? to.x;
+    const c2y = to.in?.y ?? to.y;
+    return `C ${c1x} ${c1y} ${c2x} ${c2y} ${to.x} ${to.y}`;
   }
 }

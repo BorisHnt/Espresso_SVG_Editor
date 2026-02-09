@@ -429,7 +429,9 @@ textarea:focus-visible {
 
 #canvasOverlay .guide-line,
 #canvasOverlay .resize-handle,
-#canvasOverlay .resize-edge {
+#canvasOverlay .resize-edge,
+#canvasOverlay .path-anchor,
+#canvasOverlay .path-handle {
   pointer-events: all;
 }
 
@@ -507,6 +509,34 @@ textarea:focus-visible {
   stroke: color-mix(in srgb, var(--primary) 64%, transparent 36%);
   stroke-width: 0.9;
   stroke-dasharray: 4 3;
+}
+
+#canvasOverlay .path-handle-link {
+  stroke: color-mix(in srgb, var(--primary) 56%, transparent 44%);
+  stroke-width: 0.8;
+}
+
+#canvasOverlay .path-handle {
+  fill: var(--bg-main);
+  stroke: var(--secondary);
+  stroke-width: 1;
+  cursor: crosshair;
+}
+
+#canvasOverlay .path-anchor {
+  fill: var(--bg-panel);
+  stroke: var(--primary);
+  stroke-width: 1;
+  cursor: move;
+}
+
+#canvasOverlay .path-anchor.is-start {
+  stroke: color-mix(in srgb, var(--secondary) 80%, var(--primary) 20%);
+}
+
+#canvasOverlay .path-anchor.is-active {
+  fill: color-mix(in srgb, var(--primary) 30%, var(--bg-main) 70%);
+  stroke: var(--secondary);
 }
 
 #canvasOverlay .resize-handle.handle-n,

@@ -78,6 +78,7 @@ export class ToolsPanel {
   onKeyDown(event) {
     const targetTag = event.target.tagName.toLowerCase();
     const isTypingContext = ["textarea", "input"].includes(targetTag) || event.target.isContentEditable;
+    const isPathTool = this.store.getState().tool === "path";
 
     if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z") {
       event.preventDefault();
@@ -92,6 +93,10 @@ export class ToolsPanel {
     }
 
     if (isTypingContext) {
+      return;
+    }
+
+    if (isPathTool && ["backspace", "delete", "enter", "escape", "c"].includes(event.key.toLowerCase())) {
       return;
     }
 
