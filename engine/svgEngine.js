@@ -7,6 +7,7 @@ import { applyGeometry, getGeometry, translateElement } from "./transform.js";
 import { formatXml, minifyXml } from "../utils/xml.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
+const ROOT_PRESERVED_ATTRS = new Set(["id", "role", "aria-label"]);
 
 function unitFactor(unit, dpi) {
   if (unit === "px") {
@@ -264,6 +265,7 @@ export class SvgEngine {
   importSvgRoot(root) {
     this.pathSession = null;
     this.clearPathEditorOverlay();
+    this.applyRootAttributes(root);
     this.scene.innerHTML = "";
     const incomingDefs = root.querySelector("defs");
     this.defs.innerHTML = incomingDefs ? incomingDefs.innerHTML : "";
@@ -292,6 +294,43 @@ export class SvgEngine {
     this.eventBus.emit("layers:refresh", this.getLayerModel());
   }
 
+  applyRootAttributes(root) {
+    const preserved = {};
+    ROOT_PRESERVED_ATTRS.forEach((name) => {
+      const value = this.svg.getAttribute(name);
+      if (value !== null) {
+        preserved[name] = value;
+      }
+    });
+
+    Array.from(this.svg.attributes).forEach((attribute) => {
+      if (!ROOT_PRESERVED_ATTRS.has(attribute.name)) {
+        this.svg.removeAttribute(attribute.name);
+      }
+    });
+
+    this.svg.setAttribute("xmlns", SVG_NS);
+    Array.from(root.attributes).forEach((attribute) => {
+      if (ROOT_PRESERVED_ATTRS.has(attribute.name)) {
+        return;
+      }
+      this.svg.setAttribute(attribute.name, attribute.value);
+    });
+
+    Object.entries(preserved).forEach(([name, value]) => {
+      this.svg.setAttribute(name, value);
+    });
+  }
+
+  resetRootAttributes() {
+    Array.from(this.svg.attributes).forEach((attribute) => {
+      if (!ROOT_PRESERVED_ATTRS.has(attribute.name)) {
+        this.svg.removeAttribute(attribute.name);
+      }
+    });
+    this.svg.setAttribute("xmlns", SVG_NS);
+  }
+
   getCanvasConfig() {
     return this.store.getState().canvas || getDefaultCanvasConfig();
   }
@@ -305,8 +344,10 @@ export class SvgEngine {
     const widthPx = toPx(config.width, config.unit, config.dpi);
     const heightPx = toPx(config.height, config.unit, config.dpi);
 
-    this.svg.setAttribute("width", `${config.width}${config.unit}`);
-    this.svg.setAttribute("height", `${config.height}${config.unit}`);
+    const widthAttr = config.unit === "px" ? String(config.width) : `${config.width}${config.unit}`;
+    const heightAttr = config.unit === "px" ? String(config.height) : `${config.height}${config.unit}`;
+    this.svg.setAttribute("width", widthAttr);
+    this.svg.setAttribute("height", heightAttr);
     this.svg.setAttribute("data-unit", config.unit);
     this.svg.setAttribute("data-dpi", String(config.dpi));
 
@@ -1054,6 +1095,7 @@ export class SvgEngine {
     this.finalizePathSession({ cancel: true });
     const defaults = getDefaultCanvasConfig();
 
+    this.resetRootAttributes();
     this.scene.innerHTML = "";
     this.defs.innerHTML = "";
     this.seedDocument();
@@ -1549,6 +1591,7 @@ export class SvgEngine {
     clone.querySelectorAll(".is-selected").forEach((node) => {
       node.classList.remove("is-selected");
     });
+    this.normalizeSerializedClone(clone);
 
     if (options.inlineStyle) {
       clone.querySelectorAll("*").forEach((node) => {
@@ -1581,6 +1624,38 @@ export class SvgEngine {
     }
 
     return xml;
+  }
+
+  normalizeSerializedClone(clone) {
+    ["id", "role", "aria-label", "data-unit", "data-dpi"].forEach((name) => clone.removeAttribute(name));
+
+    const defsNode = clone.querySelector("#svgDefs");
+    const sceneNode = clone.querySelector("#svgScene");
+
+    if (sceneNode) {
+      const sceneChildren = Array.from(sceneNode.childNodes);
+      sceneChildren.forEach((node) => {
+        clone.insertBefore(node, sceneNode);
+      });
+      sceneNode.remove();
+    }
+
+    if (defsNode) {
+      defsNode.removeAttribute("id");
+      const hasDefsContent = defsNode.children.length > 0 || (defsNode.textContent || "").trim().length > 0;
+      if (!hasDefsContent) {
+        defsNode.remove();
+      }
+    }
+
+    clone.querySelectorAll("*").forEach((node) => {
+      if (!(node instanceof SVGElement)) {
+        return;
+      }
+      node.removeAttribute("data-name");
+      node.removeAttribute("data-hidden");
+      node.removeAttribute("data-locked");
+    });
   }
 
   loadFromCode(code, { recordHistory = true, source = "code" } = {}) {

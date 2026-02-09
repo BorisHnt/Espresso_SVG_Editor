@@ -32,7 +32,7 @@ export class CodeEditorPanel {
     this.isFocused = false;
     this.localDirty = false;
     this.pendingExternalMarkup = null;
-    this.lastDispatchedCode = "";
+    this.lastAppliedCode = "";
     this.lastSyncedMarkup = "";
 
     this.applyDebounced = debounce(() => this.applyCode({ recordHistory: false }), 120);
@@ -56,6 +56,7 @@ export class CodeEditorPanel {
       if (this.pendingExternalMarkup && this.pendingExternalMarkup !== this.textarea.value) {
         this.textarea.value = this.pendingExternalMarkup;
         this.pendingExternalMarkup = null;
+        this.lastAppliedCode = this.textarea.value;
         this.lastSyncedMarkup = this.textarea.value;
         this.renderHighlight();
       }
@@ -96,6 +97,7 @@ export class CodeEditorPanel {
 
       if (source === "code" && this.suspendSceneEcho) {
         this.lastSyncedMarkup = markup;
+        this.lastAppliedCode = this.textarea.value;
         this.localDirty = false;
         this.pendingExternalMarkup = null;
         this.suspendSceneEcho = false;
@@ -112,6 +114,7 @@ export class CodeEditorPanel {
       }
 
       this.textarea.value = markup;
+      this.lastAppliedCode = markup;
       this.lastSyncedMarkup = markup;
       this.localDirty = false;
       this.pendingExternalMarkup = null;
@@ -194,11 +197,10 @@ export class CodeEditorPanel {
 
   applyCode({ recordHistory = false, force = false } = {}) {
     const code = this.textarea.value;
-    if (!force && code === this.lastDispatchedCode) {
+    if (!force && code === this.lastAppliedCode) {
       return;
     }
 
-    this.lastDispatchedCode = code;
     this.suspendSceneEcho = true;
     this.setStatus("parsing...", false);
     this.eventBus.emit("scene:load-code", {
