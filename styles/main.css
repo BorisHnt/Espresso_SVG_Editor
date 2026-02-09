@@ -627,6 +627,10 @@ textarea:focus-visible {
   min-height: 160px;
 }
 
+.bottom-panels.properties-only {
+  grid-template-columns: 1fr;
+}
+
 .panel {
   border-right: var(--line) solid var(--border);
   border-bottom: var(--line) solid var(--border);

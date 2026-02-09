@@ -212,11 +212,7 @@
           <div id="selectionOutline" class="selection-outline hidden"></div>
         </div>
 
-        <div class="bottom-panels">
-          <section class="panel" aria-label="Calques">
-            <div class="panel-title">Layers</div>
-            <div id="layersTree" class="layers-tree"></div>
-          </section>
+        <div class="bottom-panels properties-only">
           <section class="panel" aria-label="Proprietes">
             <div class="panel-title">Properties</div>
             <div id="propertiesPanel" class="properties-panel"></div>
@@ -249,16 +245,6 @@
       <div id="codeStatus" class="code-status" role="status" aria-live="polite">ready</div>
     </section>
   </main>
-
-  <template id="layerItemTemplate">
-    <div class="layer-item" draggable="true">
-      <button class="layer-visibility icon-only" title="Afficher/Masquer"></button>
-      <button class="layer-lock icon-only" title="Verrouiller"></button>
-      <button class="layer-select" title="Selectionner"></button>
-      <button class="layer-up icon-only" title="Monter"></button>
-      <button class="layer-down icon-only" title="Descendre"></button>
-    </div>
-  </template>
 
   <input id="fileImportInput" type="file" accept=".svg,image/*" hidden />
 

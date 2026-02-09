@@ -7,7 +7,6 @@ import { setupImporters } from "./importers/index.js";
 import { optimizeMarkup } from "./optimizer/optimizer.js";
 import { CanvasSettingsPanel } from "./ui/canvasSettings.js";
 import { CodeEditorPanel } from "./ui/codeEditor.js";
-import { LayersPanel } from "./ui/layers.js";
 import { PropertiesPanel } from "./ui/properties.js";
 import { ToolsPanel } from "./ui/tools.js";
 
@@ -34,8 +33,6 @@ const dom = {
   codeHighlight: document.getElementById("codeHighlight"),
   codeStatus: document.getElementById("codeStatus"),
   defsViewer: document.getElementById("defsViewer"),
-  layersTree: document.getElementById("layersTree"),
-  layerTemplate: document.getElementById("layerItemTemplate"),
   propertiesPanel: document.getElementById("propertiesPanel"),
   fileImportInput: document.getElementById("fileImportInput"),
 };
@@ -44,12 +41,6 @@ new ToolsPanel({
   root: document,
   eventBus,
   store,
-});
-
-new LayersPanel({
-  root: dom.layersTree,
-  template: dom.layerTemplate,
-  eventBus,
 });
 
 new PropertiesPanel({
