@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Limelight&display=swap");
+
 :root {
   --radius: 6px;
   --line: 1px;
@@ -7,6 +9,7 @@
   --transition-fast: 140ms ease;
   --font-ui: "Avenir Next", "Segoe UI", "Noto Sans", sans-serif;
   --font-code: "JetBrains Mono", "Cascadia Mono", "SF Mono", monospace;
+  --font-brand: "Limelight", "Avenir Next", "Segoe UI", sans-serif;
   --icon-size: 16px;
   --icon-stroke: 1.8;
   --ruler-size: 22px;
@@ -99,6 +102,7 @@ textarea {
   margin: 0;
   font-size: 18px;
   letter-spacing: 0.8px;
+  font-family: var(--font-brand);
 }
 
 .subtitle {

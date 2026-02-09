@@ -550,39 +550,66 @@ export class SvgEngine {
   }
 
   onWindowKeyDown(event) {
-    if (this.currentTool !== "path" || !this.pathSession) {
-      return;
-    }
-
     const targetTag = event.target?.tagName?.toLowerCase?.() || "";
     if (["input", "textarea", "select"].includes(targetTag) || event.target?.isContentEditable) {
       return;
     }
 
-    const key = event.key.toLowerCase();
+    if (this.currentTool === "path" && this.pathSession) {
+      const key = event.key.toLowerCase();
 
-    if (event.key === "Escape") {
-      event.preventDefault();
-      this.finalizePathSession({ cancel: true });
+      if (event.key === "Escape") {
+        event.preventDefault();
+        this.finalizePathSession({ cancel: true });
+        return;
+      }
+
+      if (event.key === "Enter") {
+        event.preventDefault();
+        this.finalizePathSession({ close: event.shiftKey });
+        return;
+      }
+
+      if (event.key === "Backspace") {
+        event.preventDefault();
+        this.removeLastPathAnchor();
+        return;
+      }
+
+      if (key === "c" && !event.ctrlKey && !event.metaKey) {
+        event.preventDefault();
+        this.toggleActiveAnchorCurve();
+        return;
+      }
+    }
+
+    this.handleKeyboardNudge(event);
+  }
+
+  handleKeyboardNudge(event) {
+    const selected = this.selection.getSelectedElement();
+    if (!selected || this.isLocked(selected)) {
       return;
     }
 
-    if (event.key === "Enter") {
-      event.preventDefault();
-      this.finalizePathSession({ close: event.shiftKey });
+    const vectorByKey = {
+      ArrowLeft: { x: -1, y: 0 },
+      ArrowRight: { x: 1, y: 0 },
+      ArrowUp: { x: 0, y: -1 },
+      ArrowDown: { x: 0, y: 1 },
+    };
+    const vector = vectorByKey[event.key];
+    if (!vector) {
       return;
     }
 
-    if (event.key === "Backspace") {
-      event.preventDefault();
-      this.removeLastPathAnchor();
-      return;
-    }
-
-    if (key === "c" && !event.ctrlKey && !event.metaKey) {
-      event.preventDefault();
-      this.toggleActiveAnchorCurve();
-    }
+    event.preventDefault();
+    const step = event.shiftKey ? 10 : 1;
+    const before = this.snapshot();
+    translateElement(selected, vector.x * step, vector.y * step);
+    this.selection.refreshOutline();
+    this.pushSnapshotHistory("Nudge element", before);
+    this.emitSceneChanged("canvas");
   }
 
   handlePathPointerDown(point, event) {
@@ -738,6 +765,11 @@ export class SvgEngine {
 
     const role = target.dataset.pathRole;
     if (role === "anchor") {
+      if (index === 0 && session.anchors.length >= 3 && !event.altKey) {
+        this.finalizePathSession({ close: true });
+        return;
+      }
+
       this.pointerAction = {
         type: "path-move-anchor",
         index,

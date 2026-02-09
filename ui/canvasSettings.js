@@ -371,6 +371,10 @@ export class CanvasSettingsPanel {
     });
 
     window.addEventListener("resize", () => this.renderOverlay());
+
+    this.eventBus.on("canvas:quick-logo", () => {
+      this.applyQuickLogoMode(64);
+    });
   }
 
   bindNumberField(element, callback) {
@@ -622,6 +626,36 @@ export class CanvasSettingsPanel {
     this.updateConfig(preset.config, `preset-${preset.id}`);
   }
 
+  applyQuickLogoMode(size = 64) {
+    const iconSize = Math.max(8, Math.round(size));
+    this.updateConfig(
+      {
+        width: iconSize,
+        height: iconSize,
+        unit: "px",
+        dpi: 96,
+        viewBox: {
+          x: 0,
+          y: 0,
+          width: iconSize,
+          height: iconSize,
+        },
+        grid: {
+          enabled: true,
+          snap: true,
+          spacing: 1,
+          subdivisions: 1,
+        },
+        rulers: false,
+        guidesVisible: false,
+        zonesVisible: false,
+      },
+      "quick-logo",
+      true,
+    );
+    this.eventBus.emit("view:zoom-fit");
+  }
+
   savePreset() {
     const name = this.controls.presetName.value.trim();
     if (!name) {
@@ -768,18 +802,47 @@ export class CanvasSettingsPanel {
     const vb = config.viewBox;
     const spacing = Math.max(1, config.grid.spacing);
     const subdivisions = Math.max(1, config.grid.subdivisions);
-    const minorStep = spacing / subdivisions;
 
-    const xStart = Math.floor(vb.x / minorStep) * minorStep;
+    const viewportWidth = Math.max(this.viewport.clientWidth, 1);
+    const viewportHeight = Math.max(this.viewport.clientHeight, 1);
+    const pxPerUnitX = viewportWidth / Math.max(vb.width, 1);
+    const pxPerUnitY = viewportHeight / Math.max(vb.height, 1);
+    const pxPerUnit = Math.max(0.0001, Math.min(pxPerUnitX, pxPerUnitY));
+
+    const majorMinPx = 24;
+    const minorMinPx = 10;
+
+    let displayMajorStep = spacing;
+    while (displayMajorStep * pxPerUnit < majorMinPx) {
+      displayMajorStep *= 2;
+      if (displayMajorStep > 1e7) {
+        break;
+      }
+    }
+
+    const displayMinorStep = displayMajorStep / subdivisions;
+    const drawMinor = displayMinorStep * pxPerUnit >= minorMinPx;
+    const step = drawMinor ? displayMinorStep : displayMajorStep;
+    const epsilon = step * 0.001;
+
+    const xStart = Math.floor((vb.x - epsilon) / step) * step;
     const xEnd = vb.x + vb.width;
-    const yStart = Math.floor(vb.y / minorStep) * minorStep;
+    const yStart = Math.floor((vb.y - epsilon) / step) * step;
     const yEnd = vb.y + vb.height;
 
+    const isMajorLine = (value) => {
+      const ratio = value / displayMajorStep;
+      return Math.abs(ratio - Math.round(ratio)) < 0.001;
+    };
+
     let lineCount = 0;
-    for (let x = xStart; x <= xEnd; x += minorStep) {
+    for (let x = xStart; x <= xEnd + epsilon; x += step) {
       const rounded = round(x, 4);
-      const isMajor = Math.abs((rounded / spacing) % 1) < 0.0001 || Math.abs((rounded / spacing) % 1 - 1) < 0.0001;
-      this.gridLayer.append(this.createSvgLine(rounded, yStart, rounded, yEnd, isMajor ? "grid-major" : "grid-minor"));
+      const isMajor = isMajorLine(rounded);
+      const className = drawMinor
+        ? (isMajor ? "grid-major" : "grid-minor")
+        : "grid-major";
+      this.gridLayer.append(this.createSvgLine(rounded, yStart, rounded, yEnd, className));
       lineCount += 1;
       if (lineCount > 2600) {
         break;
@@ -787,10 +850,13 @@ export class CanvasSettingsPanel {
     }
 
     lineCount = 0;
-    for (let y = yStart; y <= yEnd; y += minorStep) {
+    for (let y = yStart; y <= yEnd + epsilon; y += step) {
       const rounded = round(y, 4);
-      const isMajor = Math.abs((rounded / spacing) % 1) < 0.0001 || Math.abs((rounded / spacing) % 1 - 1) < 0.0001;
-      this.gridLayer.append(this.createSvgLine(vb.x, rounded, xEnd, rounded, isMajor ? "grid-major" : "grid-minor"));
+      const isMajor = isMajorLine(rounded);
+      const className = drawMinor
+        ? (isMajor ? "grid-major" : "grid-minor")
+        : "grid-major";
+      this.gridLayer.append(this.createSvgLine(vb.x, rounded, xEnd, rounded, className));
       lineCount += 1;
       if (lineCount > 2600) {
         break;

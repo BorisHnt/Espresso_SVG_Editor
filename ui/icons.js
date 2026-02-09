@@ -38,6 +38,7 @@ export const ACTION_ICON_MAP = {
   ruler: "ruler-2",
   guides: "line-dashed",
   checker: "template",
+  quickLogo: "artboard",
   zoomIn: "zoom-in",
   zoomOut: "zoom-out",
   zoomFit: "zoom-reset",

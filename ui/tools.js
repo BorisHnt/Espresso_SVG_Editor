@@ -28,6 +28,7 @@ export class ToolsPanel {
     decorateButton(document.getElementById("zoomInBtn"), ACTION_ICON_MAP.zoomIn, "Zoom in", { iconOnly: true });
     decorateButton(document.getElementById("zoomOutBtn"), ACTION_ICON_MAP.zoomOut, "Zoom out", { iconOnly: true });
     decorateButton(document.getElementById("zoomFitBtn"), ACTION_ICON_MAP.zoomFit, "Zoom fit", { iconOnly: true });
+    decorateButton(document.getElementById("quickLogoBtn"), ACTION_ICON_MAP.quickLogo, "Logo 64", { iconOnly: true });
     decorateButton(document.getElementById("deleteBtn"), ACTION_ICON_MAP.delete, "Delete", { iconOnly: true });
 
     decorateButton(document.getElementById("prettyBtn"), ACTION_ICON_MAP.pretty, "Pretty", { iconOnly: true });
@@ -51,6 +52,7 @@ export class ToolsPanel {
     document.getElementById("zoomInBtn").addEventListener("click", () => this.eventBus.emit("view:zoom-in"));
     document.getElementById("zoomOutBtn").addEventListener("click", () => this.eventBus.emit("view:zoom-out"));
     document.getElementById("zoomFitBtn").addEventListener("click", () => this.eventBus.emit("view:zoom-fit"));
+    document.getElementById("quickLogoBtn").addEventListener("click", () => this.eventBus.emit("canvas:quick-logo"));
     document.getElementById("deleteBtn").addEventListener("click", () => this.eventBus.emit("selection:delete"));
 
     document.getElementById("undoBtn").addEventListener("click", () => this.eventBus.emit("history:undo"));
