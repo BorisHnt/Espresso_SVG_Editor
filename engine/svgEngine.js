@@ -1,4 +1,5 @@
 import { Command } from "../core/history.js";
+import { getDefaultCanvasConfig } from "../core/state.js";
 import { PathEditor } from "./pathEditor.js";
 import { SelectionManager } from "./selection.js";
 import { snapPoint } from "./snapping.js";
@@ -6,6 +7,44 @@ import { applyGeometry, getGeometry, translateElement } from "./transform.js";
 import { formatXml, minifyXml } from "../utils/xml.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
+
+function unitFactor(unit, dpi) {
+  if (unit === "px") {
+    return 1;
+  }
+  if (unit === "mm") {
+    return dpi / 25.4;
+  }
+  if (unit === "cm") {
+    return dpi / 2.54;
+  }
+  if (unit === "in") {
+    return dpi;
+  }
+  return 1;
+}
+
+function toPx(value, unit, dpi) {
+  return value * unitFactor(unit, dpi);
+}
+
+function fromPx(value, unit, dpi) {
+  return value / unitFactor(unit, dpi);
+}
+
+function parseLength(value) {
+  if (!value) {
+    return null;
+  }
+  const match = String(value).trim().match(/^([0-9]*\.?[0-9]+)\s*(px|mm|cm|in)?$/i);
+  if (!match) {
+    return null;
+  }
+  return {
+    value: Number.parseFloat(match[1]),
+    unit: (match[2] || "px").toLowerCase(),
+  };
+}
 
 function parseSvgString(source) {
   const parser = new DOMParser();
@@ -47,6 +86,11 @@ export class SvgEngine {
 
     this.#bindEvents();
     this.#restoreDocument();
+    this.applyCanvasConfig(this.getCanvasConfig(), {
+      source: "boot",
+      recordHistory: false,
+      emitScene: false,
+    });
     this.emitSceneChanged("boot");
   }
 
@@ -75,6 +119,9 @@ export class SvgEngine {
     this.eventBus.on("view:zoom-in", () => this.zoomBy(1.2));
     this.eventBus.on("view:zoom-out", () => this.zoomBy(1 / 1.2));
     this.eventBus.on("view:zoom-fit", () => this.fitToCanvas());
+    this.eventBus.on("canvas:apply-config", ({ config, source = "canvas-settings", recordHistory = true }) => {
+      this.applyCanvasConfig(config, { source, recordHistory });
+    });
 
     this.eventBus.on("image:insert", ({ dataUrl, x = 120, y = 120, width = 240, height = 180 }) => {
       const before = this.snapshot();
@@ -177,12 +224,16 @@ export class SvgEngine {
   }
 
   seedDocument() {
+    const canvasConfig = this.getCanvasConfig();
+    const widthPx = toPx(canvasConfig.width, canvasConfig.unit, canvasConfig.dpi);
+    const heightPx = toPx(canvasConfig.height, canvasConfig.unit, canvasConfig.dpi);
+
     const bg = document.createElementNS(SVG_NS, "rect");
     this.assignNodeId(bg, "artboard");
     bg.setAttribute("x", "0");
     bg.setAttribute("y", "0");
-    bg.setAttribute("width", "1200");
-    bg.setAttribute("height", "800");
+    bg.setAttribute("width", widthPx);
+    bg.setAttribute("height", heightPx);
     bg.setAttribute("fill", "#ffffff");
     bg.setAttribute("stroke", "#d4d0c8");
     bg.setAttribute("stroke-width", "1");
@@ -214,8 +265,86 @@ export class SvgEngine {
       this.svg.setAttribute("viewBox", viewBox);
     }
 
+    this.syncCanvasConfigFromSvg();
     this.eventBus.emit("defs:changed", this.getDefsSummary());
     this.eventBus.emit("layers:refresh", this.getLayerModel());
+  }
+
+  getCanvasConfig() {
+    return this.store.getState().canvas || getDefaultCanvasConfig();
+  }
+
+  applyCanvasConfig(config, { source = "canvas-settings", recordHistory = true, emitScene = true } = {}) {
+    if (!config) {
+      return;
+    }
+
+    const before = this.snapshot();
+    const widthPx = toPx(config.width, config.unit, config.dpi);
+    const heightPx = toPx(config.height, config.unit, config.dpi);
+
+    this.svg.setAttribute("width", `${config.width}${config.unit}`);
+    this.svg.setAttribute("height", `${config.height}${config.unit}`);
+    this.svg.setAttribute("data-unit", config.unit);
+    this.svg.setAttribute("data-dpi", String(config.dpi));
+
+    const artboard = this.scene.querySelector("[id^='artboard-'], [data-name='Artboard']");
+    if (artboard?.tagName?.toLowerCase() === "rect") {
+      artboard.setAttribute("width", widthPx);
+      artboard.setAttribute("height", heightPx);
+    }
+
+    this.setViewBox(config.viewBox, { silentState: true });
+    this.selection.refreshOutline();
+
+    if (recordHistory) {
+      this.pushSnapshotHistory("Canvas settings", before);
+    }
+
+    if (emitScene) {
+      this.emitSceneChanged(source);
+    }
+  }
+
+  syncCanvasConfigFromSvg() {
+    const current = this.getCanvasConfig();
+    const viewBox = this.getViewBoxObject();
+    const dpi = Number.parseFloat(this.svg.getAttribute("data-dpi")) || current.dpi;
+
+    const parsedWidth = parseLength(this.svg.getAttribute("width"));
+    const parsedHeight = parseLength(this.svg.getAttribute("height"));
+
+    let unit = current.unit;
+    let width = current.width;
+    let height = current.height;
+
+    if (parsedWidth && parsedHeight && parsedWidth.unit === parsedHeight.unit) {
+      unit = parsedWidth.unit;
+      width = parsedWidth.value;
+      height = parsedHeight.value;
+    } else {
+      width = fromPx(viewBox.width, unit, dpi);
+      height = fromPx(viewBox.height, unit, dpi);
+    }
+
+    const nextConfig = {
+      ...current,
+      width: Number(width.toFixed(unit === "px" ? 0 : 3)),
+      height: Number(height.toFixed(unit === "px" ? 0 : 3)),
+      unit,
+      dpi,
+      viewBox,
+    };
+
+    this.store.set(
+      {
+        canvas: nextConfig,
+        showGrid: nextConfig.grid.enabled,
+        snapEnabled: nextConfig.grid.snap,
+      },
+      { silent: true },
+    );
+    this.eventBus.emit("canvas:viewbox:changed", { viewBox });
   }
 
   onPointerDown(event) {
@@ -234,8 +363,10 @@ export class SvgEngine {
     }
 
     const rawPoint = this.clientToSvg(event.clientX, event.clientY);
-    const snapEnabled = this.store.getState().snapEnabled;
-    const point = snapPoint(rawPoint, 10, snapEnabled);
+    const canvasConfig = this.getCanvasConfig();
+    const snapEnabled = canvasConfig.grid?.snap ?? this.store.getState().snapEnabled;
+    const spacing = canvasConfig.grid?.spacing ?? 10;
+    const point = snapPoint(rawPoint, spacing, snapEnabled);
 
     if (this.currentTool === "select") {
       const target = this.findEditableTarget(event.target);
@@ -319,7 +450,10 @@ export class SvgEngine {
     }
 
     const rawPoint = this.clientToSvg(event.clientX, event.clientY);
-    const point = snapPoint(rawPoint, 10, this.store.getState().snapEnabled);
+    const canvasConfig = this.getCanvasConfig();
+    const snapEnabled = canvasConfig.grid?.snap ?? this.store.getState().snapEnabled;
+    const spacing = canvasConfig.grid?.spacing ?? 10;
+    const point = snapPoint(rawPoint, spacing, snapEnabled);
 
     if (this.pointerAction.type === "move") {
       const { element, original, start } = this.pointerAction;
@@ -745,19 +879,46 @@ export class SvgEngine {
   }
 
   getViewBoxObject() {
-    const [x = 0, y = 0, width = 1200, height = 800] = (this.svg.getAttribute("viewBox") || "0 0 1200 800")
+    const canvasConfig = this.getCanvasConfig();
+    const defaultWidth = toPx(canvasConfig.width, canvasConfig.unit, canvasConfig.dpi);
+    const defaultHeight = toPx(canvasConfig.height, canvasConfig.unit, canvasConfig.dpi);
+
+    const [x = 0, y = 0, width = defaultWidth, height = defaultHeight] = (
+      this.svg.getAttribute("viewBox") || `0 0 ${defaultWidth} ${defaultHeight}`
+    )
       .split(/\s+/)
       .map((value) => Number.parseFloat(value));
     return { x, y, width, height };
   }
 
-  setViewBox(box) {
+  setViewBox(box, options = { silentState: true }) {
+    const normalized = {
+      x: Number(box.x.toFixed(2)),
+      y: Number(box.y.toFixed(2)),
+      width: Number(box.width.toFixed(2)),
+      height: Number(box.height.toFixed(2)),
+    };
+
     this.svg.setAttribute(
       "viewBox",
-      `${Number(box.x.toFixed(2))} ${Number(box.y.toFixed(2))} ${Number(box.width.toFixed(2))} ${Number(box.height.toFixed(2))}`,
+      `${normalized.x} ${normalized.y} ${normalized.width} ${normalized.height}`,
     );
-    const zoom = 1200 / box.width;
-    this.store.set({ zoom: Number(zoom.toFixed(2)) });
+
+    const canvasConfig = this.getCanvasConfig();
+    const baseWidth = toPx(canvasConfig.width, canvasConfig.unit, canvasConfig.dpi);
+    const zoom = baseWidth / normalized.width;
+    this.store.set(
+      {
+        zoom: Number(zoom.toFixed(2)),
+        canvas: {
+          ...canvasConfig,
+          viewBox: normalized,
+        },
+      },
+      { silent: options.silentState },
+    );
+
+    this.eventBus.emit("canvas:viewbox:changed", { viewBox: normalized });
   }
 
   zoomBy(multiplier, centerClient = null) {
@@ -783,7 +944,10 @@ export class SvgEngine {
   }
 
   fitToCanvas() {
-    this.setViewBox({ x: 0, y: 0, width: 1200, height: 800 });
+    const canvasConfig = this.getCanvasConfig();
+    const width = toPx(canvasConfig.width, canvasConfig.unit, canvasConfig.dpi);
+    const height = toPx(canvasConfig.height, canvasConfig.unit, canvasConfig.dpi);
+    this.setViewBox({ x: 0, y: 0, width, height });
     this.selection.refreshOutline();
     this.emitSceneChanged("canvas");
   }

@@ -36,6 +36,7 @@ python3 -m http.server 8080
 - Outils: select, rect, roundRect, circle, ellipse, line, polyline, polygon, pen, text, image, group, clipPath, mask, symbol/use, gradient, filter
 - Edition: deplacement, contraintes `Shift`, suppression, ordre de calque, rename, lock/hide
 - Canvas: zoom/pan (`wheel`, alt+drag), grille, checker optionnel, snapping
+- Canvas Settings avance: dimensions, unites, DPI, viewBox, presets, regles, guides drag/drop, marges, bleed, safe zones, resize handles
 - Calques: liste DOM, selection croisee, reorder, lock/hide
 - Proprietes: edition geometrique et style sur selection
 - Code SVG: edition live, coloration, pretty print, minify, validation parse, defs viewer, inline styles toggle
@@ -59,4 +60,5 @@ python3 -m http.server 8080
 ## Notes
 
 - L'app est desktop-first et fonctionne sans dependance externe.
+- Les boutons/actions utilisent un sprite local d'icones Tabler (`assets/tabler-sprite.svg`) et suivent automatiquement le theme actif.
 - Certaines fonctions avancees (booleans complexes, edition de noeuds bezier complete, PDF natif vectoriel, plugin API complete) sont prevues pour une iteration suivante.

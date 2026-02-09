@@ -1,3 +1,5 @@
+import { ACTION_ICON_MAP, decorateButton, decorateToolButton } from "./icons.js";
+
 export class ToolsPanel {
   constructor({ root, eventBus, store }) {
     this.root = root;
@@ -6,12 +8,31 @@ export class ToolsPanel {
 
     this.toolButtons = Array.from(root.querySelectorAll(".tool-btn"));
     this.themeToggle = document.getElementById("themeToggle");
-    this.gridToggle = document.getElementById("gridToggle");
-    this.snapToggle = document.getElementById("snapToggle");
-    this.checkerToggle = document.getElementById("checkerToggle");
 
     this.bind();
+    this.decorate();
     this.applyState(store.getState());
+  }
+
+  decorate() {
+    this.toolButtons.forEach((button) => decorateToolButton(button));
+
+    decorateButton(document.getElementById("undoBtn"), ACTION_ICON_MAP.undo, "Undo", { iconOnly: true });
+    decorateButton(document.getElementById("redoBtn"), ACTION_ICON_MAP.redo, "Redo", { iconOnly: true });
+    decorateButton(document.getElementById("importBtn"), ACTION_ICON_MAP.import, "Import", { iconOnly: true });
+    decorateButton(document.getElementById("exportSvgBtn"), ACTION_ICON_MAP.exportSvg, "SVG", { iconOnly: true });
+    decorateButton(document.getElementById("exportPngBtn"), ACTION_ICON_MAP.exportPng, "PNG", { iconOnly: true });
+    decorateButton(document.getElementById("exportJpgBtn"), ACTION_ICON_MAP.exportJpg, "JPG", { iconOnly: true });
+
+    decorateButton(document.getElementById("zoomInBtn"), ACTION_ICON_MAP.zoomIn, "Zoom in", { iconOnly: true });
+    decorateButton(document.getElementById("zoomOutBtn"), ACTION_ICON_MAP.zoomOut, "Zoom out", { iconOnly: true });
+    decorateButton(document.getElementById("zoomFitBtn"), ACTION_ICON_MAP.zoomFit, "Zoom fit", { iconOnly: true });
+    decorateButton(document.getElementById("deleteBtn"), ACTION_ICON_MAP.delete, "Delete", { iconOnly: true });
+
+    decorateButton(document.getElementById("prettyBtn"), ACTION_ICON_MAP.pretty, "Pretty", { iconOnly: true });
+    decorateButton(document.getElementById("minifyBtn"), ACTION_ICON_MAP.minify, "Minify", { iconOnly: true });
+    decorateButton(document.getElementById("inlineStyleBtn"), ACTION_ICON_MAP.inlineStyle, "Inline", { iconOnly: true });
+    decorateButton(document.getElementById("defsViewerBtn"), ACTION_ICON_MAP.defs, "Defs", { iconOnly: true });
   }
 
   bind() {
@@ -24,20 +45,6 @@ export class ToolsPanel {
     this.themeToggle.addEventListener("click", () => {
       const nextTheme = this.store.getState().theme === "latte" ? "ristretto" : "latte";
       this.store.set({ theme: nextTheme });
-    });
-
-    this.gridToggle.addEventListener("change", (event) => {
-      this.store.set({ showGrid: event.target.checked });
-      this.eventBus.emit("canvas:grid-toggle", { enabled: event.target.checked });
-    });
-
-    this.snapToggle.addEventListener("change", (event) => {
-      this.store.set({ snapEnabled: event.target.checked });
-    });
-
-    this.checkerToggle.addEventListener("change", (event) => {
-      this.store.set({ showChecker: event.target.checked });
-      this.eventBus.emit("canvas:checker-toggle", { enabled: event.target.checked });
     });
 
     document.getElementById("zoomInBtn").addEventListener("click", () => this.eventBus.emit("view:zoom-in"));
@@ -119,14 +126,29 @@ export class ToolsPanel {
 
   applyState(state) {
     document.body.dataset.theme = state.theme;
-    this.themeToggle.textContent = state.theme === "latte" ? "Latte" : "Ristretto";
+    decorateButton(
+      this.themeToggle,
+      state.theme === "latte" ? ACTION_ICON_MAP.themeLatte : ACTION_ICON_MAP.themeRistretto,
+      state.theme === "latte" ? "Latte" : "Ristretto",
+      { iconOnly: true },
+    );
 
     this.toolButtons.forEach((button) => {
       button.classList.toggle("active", button.dataset.tool === state.tool);
     });
 
-    this.gridToggle.checked = state.showGrid;
-    this.snapToggle.checked = state.snapEnabled;
-    this.checkerToggle.checked = state.showChecker;
+    decorateButton(
+      document.getElementById("codeCollapseBtn"),
+      state.codeCollapsed ? ACTION_ICON_MAP.codeExpand : ACTION_ICON_MAP.codeCollapse,
+      "Collapse",
+      { iconOnly: true },
+    );
+
+    decorateButton(
+      document.getElementById("codeFullscreenBtn"),
+      state.codeFullscreen ? ACTION_ICON_MAP.fullscreenExit : ACTION_ICON_MAP.fullscreen,
+      "Fullscreen",
+      { iconOnly: true },
+    );
   }
 }

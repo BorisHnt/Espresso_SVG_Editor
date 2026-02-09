@@ -1,6 +1,33 @@
 const STORAGE_KEY = "espresso-svg-state-v1";
 const DOC_STORAGE_KEY = "espresso-svg-doc-v1";
 
+function createDefaultCanvasConfig() {
+  return {
+    width: 1200,
+    height: 800,
+    unit: "px",
+    dpi: 96,
+    viewBox: {
+      x: 0,
+      y: 0,
+      width: 1200,
+      height: 800,
+    },
+    grid: {
+      enabled: true,
+      spacing: 25,
+      subdivisions: 5,
+      snap: true,
+    },
+    rulers: false,
+    guidesVisible: true,
+    guides: [],
+    margins: { top: 24, right: 24, bottom: 24, left: 24 },
+    bleed: { top: 0, right: 0, bottom: 0, left: 0 },
+    safe: { top: 36, right: 36, bottom: 36, left: 36 },
+  };
+}
+
 const defaultState = {
   theme: "latte",
   codeWidth: 34,
@@ -13,13 +40,21 @@ const defaultState = {
   snapEnabled: true,
   zoom: 1,
   inlineStyle: false,
+  canvas: createDefaultCanvasConfig(),
+  canvasUserPresets: [],
 };
 
 export class Store {
   constructor(eventBus) {
     this.eventBus = eventBus;
     const persisted = this.#load();
-    this.state = { ...defaultState, ...persisted };
+    this.state = {
+      ...defaultState,
+      canvas: createDefaultCanvasConfig(),
+      ...persisted,
+      canvas: persisted.canvas ? persisted.canvas : createDefaultCanvasConfig(),
+      canvasUserPresets: Array.isArray(persisted.canvasUserPresets) ? persisted.canvasUserPresets : [],
+    };
     this.subscribers = new Set();
   }
 
@@ -77,5 +112,9 @@ export class Store {
 }
 
 export function getDefaultState() {
-  return { ...defaultState };
+  return { ...defaultState, canvas: createDefaultCanvasConfig(), canvasUserPresets: [] };
+}
+
+export function getDefaultCanvasConfig() {
+  return createDefaultCanvasConfig();
 }

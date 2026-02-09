@@ -13,13 +13,14 @@
       <span class="subtitle">Vanilla SVG Editor</span>
     </div>
     <div class="header-actions">
-      <button id="themeToggle" class="icon-btn" title="Basculer thème">Latte</button>
-      <button id="undoBtn" class="icon-btn" title="Annuler (Ctrl+Z)">Undo</button>
-      <button id="redoBtn" class="icon-btn" title="Rétablir (Ctrl+Shift+Z)">Redo</button>
-      <button id="importBtn" class="icon-btn" title="Importer SVG">Import</button>
-      <button id="exportSvgBtn" class="icon-btn" title="Exporter SVG">SVG</button>
-      <button id="exportPngBtn" class="icon-btn" title="Exporter PNG">PNG</button>
-      <button id="exportJpgBtn" class="icon-btn" title="Exporter JPG">JPG</button>
+      <button id="canvasSettingsBtn" class="icon-btn" title="Canvas Settings"></button>
+      <button id="themeToggle" class="icon-btn" title="Basculer theme"></button>
+      <button id="undoBtn" class="icon-btn" title="Annuler (Ctrl+Z)"></button>
+      <button id="redoBtn" class="icon-btn" title="Retablir (Ctrl+Shift+Z)"></button>
+      <button id="importBtn" class="icon-btn" title="Importer SVG"></button>
+      <button id="exportSvgBtn" class="icon-btn" title="Exporter SVG"></button>
+      <button id="exportPngBtn" class="icon-btn" title="Exporter PNG"></button>
+      <button id="exportJpgBtn" class="icon-btn" title="Exporter JPG"></button>
     </div>
   </header>
 
@@ -28,51 +29,183 @@
       <aside class="tools-panel" aria-label="Outils">
         <div class="panel-title">Tools</div>
         <div id="toolButtons" class="tool-buttons" role="toolbar">
-          <button class="tool-btn active" data-tool="select">Select</button>
-          <button class="tool-btn" data-tool="rect">Rect</button>
-          <button class="tool-btn" data-tool="roundRect">RoundRect</button>
-          <button class="tool-btn" data-tool="circle">Circle</button>
-          <button class="tool-btn" data-tool="ellipse">Ellipse</button>
-          <button class="tool-btn" data-tool="line">Line</button>
-          <button class="tool-btn" data-tool="polyline">Polyline</button>
-          <button class="tool-btn" data-tool="polygon">Polygon</button>
-          <button class="tool-btn" data-tool="path">Pen</button>
-          <button class="tool-btn" data-tool="text">Text</button>
-          <button class="tool-btn" data-tool="image">Image</button>
-          <button class="tool-btn" data-tool="group">Group</button>
-          <button class="tool-btn" data-tool="clipPath">Clip</button>
-          <button class="tool-btn" data-tool="mask">Mask</button>
-          <button class="tool-btn" data-tool="symbol">Symbol</button>
-          <button class="tool-btn" data-tool="gradient">Gradient</button>
-          <button class="tool-btn" data-tool="filter">Filter</button>
+          <button class="tool-btn active" data-tool="select" data-label="Select"></button>
+          <button class="tool-btn" data-tool="rect" data-label="Rect"></button>
+          <button class="tool-btn" data-tool="roundRect" data-label="RoundRect"></button>
+          <button class="tool-btn" data-tool="circle" data-label="Circle"></button>
+          <button class="tool-btn" data-tool="ellipse" data-label="Ellipse"></button>
+          <button class="tool-btn" data-tool="line" data-label="Line"></button>
+          <button class="tool-btn" data-tool="polyline" data-label="Polyline"></button>
+          <button class="tool-btn" data-tool="polygon" data-label="Polygon"></button>
+          <button class="tool-btn" data-tool="path" data-label="Pen"></button>
+          <button class="tool-btn" data-tool="text" data-label="Text"></button>
+          <button class="tool-btn" data-tool="image" data-label="Image"></button>
+          <button class="tool-btn" data-tool="group" data-label="Group"></button>
+          <button class="tool-btn" data-tool="clipPath" data-label="Clip"></button>
+          <button class="tool-btn" data-tool="mask" data-label="Mask"></button>
+          <button class="tool-btn" data-tool="symbol" data-label="Symbol"></button>
+          <button class="tool-btn" data-tool="gradient" data-label="Gradient"></button>
+          <button class="tool-btn" data-tool="filter" data-label="Filter"></button>
         </div>
       </aside>
 
       <section class="canvas-stack" aria-label="Zone SVG">
         <div class="canvas-toolbar">
-          <label class="inline-control">
-            <input id="gridToggle" type="checkbox" checked />
-            Grid
-          </label>
-          <label class="inline-control">
-            <input id="snapToggle" type="checkbox" checked />
-            Snap
-          </label>
-          <label class="inline-control">
-            <input id="checkerToggle" type="checkbox" />
-            Checker
-          </label>
-          <button id="zoomInBtn" class="icon-btn">+</button>
-          <button id="zoomOutBtn" class="icon-btn">-</button>
-          <button id="zoomFitBtn" class="icon-btn">Fit</button>
-          <button id="deleteBtn" class="icon-btn">Delete</button>
+          <button id="gridToggleBtn" class="icon-btn toggle-btn" title="Grille"></button>
+          <button id="snapToggleBtn" class="icon-btn toggle-btn" title="Snapping grille"></button>
+          <button id="rulerToggleBtn" class="icon-btn toggle-btn" title="Regles"></button>
+          <button id="guidesToggleBtn" class="icon-btn toggle-btn" title="Guides"></button>
+          <button id="checkerToggleBtn" class="icon-btn toggle-btn" title="Fond damier"></button>
+          <button id="zoomInBtn" class="icon-btn" title="Zoom +"></button>
+          <button id="zoomOutBtn" class="icon-btn" title="Zoom -"></button>
+          <button id="zoomFitBtn" class="icon-btn" title="Zoom fit"></button>
+          <button id="deleteBtn" class="icon-btn" title="Supprimer selection"></button>
         </div>
 
-        <div id="canvasViewport" class="canvas-viewport show-grid" tabindex="0" aria-label="Canvas SVG">
-          <svg id="editorSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-label="Éditeur SVG">
+        <section id="canvasSettingsPanel" class="canvas-settings-panel hidden" aria-label="Canvas Settings">
+          <header class="canvas-settings-header">
+            <div class="panel-title">Canvas Settings</div>
+            <button id="canvasSettingsCloseBtn" class="icon-btn icon-only" title="Fermer"></button>
+          </header>
+
+          <div class="canvas-settings-content">
+            <div class="field-row">
+              <div class="field-group grow">
+                <label for="canvasPresetSelect">Preset</label>
+                <select id="canvasPresetSelect"></select>
+              </div>
+              <button id="canvasPresetApplyBtn" class="icon-btn icon-only" title="Appliquer preset"></button>
+            </div>
+
+            <div class="field-row">
+              <div class="field-group grow">
+                <label for="canvasPresetName">Nom preset</label>
+                <input id="canvasPresetName" type="text" placeholder="My preset" />
+              </div>
+              <button id="canvasPresetSaveBtn" class="icon-btn icon-only" title="Sauvegarder preset"></button>
+              <button id="canvasPresetDeleteBtn" class="icon-btn icon-only" title="Supprimer preset"></button>
+            </div>
+
+            <div class="settings-subtitle">Document</div>
+            <div class="field-grid-4">
+              <div class="field-group">
+                <label for="canvasWidthInput">Width</label>
+                <input id="canvasWidthInput" type="number" min="1" step="1" />
+              </div>
+              <div class="field-group">
+                <label for="canvasHeightInput">Height</label>
+                <input id="canvasHeightInput" type="number" min="1" step="1" />
+              </div>
+              <div class="field-group">
+                <label for="canvasUnitSelect">Unit</label>
+                <select id="canvasUnitSelect">
+                  <option value="px">px</option>
+                  <option value="mm">mm</option>
+                  <option value="cm">cm</option>
+                  <option value="in">in</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label for="canvasDpiInput">DPI</label>
+                <input id="canvasDpiInput" type="number" min="36" step="1" />
+              </div>
+            </div>
+
+            <div class="settings-subtitle">ViewBox</div>
+            <div class="field-grid-4">
+              <div class="field-group">
+                <label for="viewBoxXInput">x</label>
+                <input id="viewBoxXInput" type="number" step="1" />
+              </div>
+              <div class="field-group">
+                <label for="viewBoxYInput">y</label>
+                <input id="viewBoxYInput" type="number" step="1" />
+              </div>
+              <div class="field-group">
+                <label for="viewBoxWInput">w</label>
+                <input id="viewBoxWInput" type="number" min="1" step="1" />
+              </div>
+              <div class="field-group">
+                <label for="viewBoxHInput">h</label>
+                <input id="viewBoxHInput" type="number" min="1" step="1" />
+              </div>
+            </div>
+
+            <div class="settings-subtitle">Grid & Snap</div>
+            <div class="field-grid-4">
+              <label class="switch-row"><input id="panelGridToggle" type="checkbox" /> Grid</label>
+              <label class="switch-row"><input id="panelSnapToggle" type="checkbox" /> Snap</label>
+              <label class="switch-row"><input id="panelRulerToggle" type="checkbox" /> Rulers</label>
+              <label class="switch-row"><input id="panelGuidesVisibleToggle" type="checkbox" /> Guides</label>
+            </div>
+            <div class="field-grid-2">
+              <div class="field-group">
+                <label for="panelGridSpacingInput">Grid spacing</label>
+                <input id="panelGridSpacingInput" type="number" min="1" step="1" />
+              </div>
+              <div class="field-group">
+                <label for="panelGridSubdivInput">Subdivisions</label>
+                <input id="panelGridSubdivInput" type="number" min="1" max="20" step="1" />
+              </div>
+            </div>
+
+            <div class="settings-subtitle">Guides</div>
+            <div class="field-row">
+              <button id="addHGuideBtn" class="icon-btn">H Guide</button>
+              <button id="addVGuideBtn" class="icon-btn">V Guide</button>
+              <button id="clearGuidesBtn" class="icon-btn">Clear</button>
+            </div>
+            <div id="guidesList" class="guides-list"></div>
+
+            <div class="settings-subtitle">Margins / Bleed / Safe</div>
+            <div class="zone-grid">
+              <div class="zone-card">
+                <div class="zone-title">Margins</div>
+                <div class="field-grid-2">
+                  <div class="field-group"><label for="marginTopInput">Top</label><input id="marginTopInput" type="number" min="0" step="1" /></div>
+                  <div class="field-group"><label for="marginRightInput">Right</label><input id="marginRightInput" type="number" min="0" step="1" /></div>
+                  <div class="field-group"><label for="marginBottomInput">Bottom</label><input id="marginBottomInput" type="number" min="0" step="1" /></div>
+                  <div class="field-group"><label for="marginLeftInput">Left</label><input id="marginLeftInput" type="number" min="0" step="1" /></div>
+                </div>
+              </div>
+              <div class="zone-card">
+                <div class="zone-title">Bleed</div>
+                <div class="field-grid-2">
+                  <div class="field-group"><label for="bleedTopInput">Top</label><input id="bleedTopInput" type="number" min="0" step="1" /></div>
+                  <div class="field-group"><label for="bleedRightInput">Right</label><input id="bleedRightInput" type="number" min="0" step="1" /></div>
+                  <div class="field-group"><label for="bleedBottomInput">Bottom</label><input id="bleedBottomInput" type="number" min="0" step="1" /></div>
+                  <div class="field-group"><label for="bleedLeftInput">Left</label><input id="bleedLeftInput" type="number" min="0" step="1" /></div>
+                </div>
+              </div>
+              <div class="zone-card">
+                <div class="zone-title">Safe</div>
+                <div class="field-grid-2">
+                  <div class="field-group"><label for="safeTopInput">Top</label><input id="safeTopInput" type="number" min="0" step="1" /></div>
+                  <div class="field-group"><label for="safeRightInput">Right</label><input id="safeRightInput" type="number" min="0" step="1" /></div>
+                  <div class="field-group"><label for="safeBottomInput">Bottom</label><input id="safeBottomInput" type="number" min="0" step="1" /></div>
+                  <div class="field-group"><label for="safeLeftInput">Left</label><input id="safeLeftInput" type="number" min="0" step="1" /></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div id="canvasViewport" class="canvas-viewport" tabindex="0" aria-label="Canvas SVG">
+          <canvas id="rulerTop" class="ruler ruler-top hidden" aria-hidden="true"></canvas>
+          <canvas id="rulerLeft" class="ruler ruler-left hidden" aria-hidden="true"></canvas>
+
+          <svg id="editorSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-label="Editeur SVG">
             <defs id="svgDefs"></defs>
             <g id="svgScene"></g>
           </svg>
+
+          <svg id="canvasOverlay" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" aria-hidden="true">
+            <g id="gridLayer"></g>
+            <g id="zonesLayer"></g>
+            <g id="guidesLayer"></g>
+            <g id="resizeLayer"></g>
+          </svg>
+
           <div id="selectionOutline" class="selection-outline hidden"></div>
         </div>
 
@@ -81,7 +214,7 @@
             <div class="panel-title">Layers</div>
             <div id="layersTree" class="layers-tree"></div>
           </section>
-          <section class="panel" aria-label="Propriétés">
+          <section class="panel" aria-label="Proprietes">
             <div class="panel-title">Properties</div>
             <div id="propertiesPanel" class="properties-panel"></div>
           </section>
@@ -95,20 +228,20 @@
       <header class="code-header">
         <div class="panel-title">Code SVG</div>
         <div class="code-actions">
-          <button id="prettyBtn" class="icon-btn">Pretty</button>
-          <button id="minifyBtn" class="icon-btn">Minify</button>
-          <button id="inlineStyleBtn" class="icon-btn">Inline Style</button>
-          <button id="defsViewerBtn" class="icon-btn">Defs</button>
-          <button id="codeCollapseBtn" class="icon-btn">Collapse</button>
-          <button id="codeFullscreenBtn" class="icon-btn">Fullscreen</button>
+          <button id="prettyBtn" class="icon-btn" title="Pretty print"></button>
+          <button id="minifyBtn" class="icon-btn" title="Minify"></button>
+          <button id="inlineStyleBtn" class="icon-btn" title="Inline style"></button>
+          <button id="defsViewerBtn" class="icon-btn" title="Defs viewer"></button>
+          <button id="codeCollapseBtn" class="icon-btn" title="Collapse code"></button>
+          <button id="codeFullscreenBtn" class="icon-btn" title="Code fullscreen"></button>
         </div>
       </header>
 
-      <section id="defsViewer" class="defs-viewer hidden" aria-label="Définitions SVG"></section>
+      <section id="defsViewer" class="defs-viewer hidden" aria-label="Definitions SVG"></section>
 
       <div class="code-editor-wrap">
         <pre id="codeHighlight" class="code-highlight" aria-hidden="true"></pre>
-        <textarea id="codeEditor" class="code-editor" spellcheck="false" aria-label="Éditeur code SVG"></textarea>
+        <textarea id="codeEditor" class="code-editor" spellcheck="false" aria-label="Editeur code SVG"></textarea>
       </div>
       <div id="codeStatus" class="code-status" role="status" aria-live="polite">ready</div>
     </section>
@@ -116,11 +249,11 @@
 
   <template id="layerItemTemplate">
     <div class="layer-item" draggable="true">
-      <button class="layer-visibility" title="Afficher/Masquer">V</button>
-      <button class="layer-lock" title="Verrouiller">U</button>
-      <button class="layer-select" title="Sélectionner"></button>
-      <button class="layer-up" title="Monter">Up</button>
-      <button class="layer-down" title="Descendre">Dn</button>
+      <button class="layer-visibility icon-only" title="Afficher/Masquer"></button>
+      <button class="layer-lock icon-only" title="Verrouiller"></button>
+      <button class="layer-select" title="Selectionner"></button>
+      <button class="layer-up icon-only" title="Monter"></button>
+      <button class="layer-down icon-only" title="Descendre"></button>
     </div>
   </template>
 

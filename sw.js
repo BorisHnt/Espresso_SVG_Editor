@@ -13,6 +13,8 @@ const ASSETS = [
   "./engine/transform.js",
   "./engine/snapping.js",
   "./ui/tools.js",
+  "./ui/icons.js",
+  "./ui/canvasSettings.js",
   "./ui/layers.js",
   "./ui/properties.js",
   "./ui/codeEditor.js",
@@ -22,6 +24,7 @@ const ASSETS = [
   "./optimizer/worker.js",
   "./animation/index.js",
   "./utils/xml.js",
+  "./assets/tabler-sprite.svg",
 ];
 
 self.addEventListener("install", (event) => {

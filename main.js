@@ -5,6 +5,7 @@ import { SvgEngine } from "./engine/svgEngine.js";
 import { setupExporters } from "./exporters/index.js";
 import { setupImporters } from "./importers/index.js";
 import { optimizeMarkup } from "./optimizer/optimizer.js";
+import { CanvasSettingsPanel } from "./ui/canvasSettings.js";
 import { CodeEditorPanel } from "./ui/codeEditor.js";
 import { LayersPanel } from "./ui/layers.js";
 import { PropertiesPanel } from "./ui/properties.js";
@@ -20,7 +21,11 @@ const dom = {
   codePanel: document.getElementById("codePanel"),
   splitter: document.getElementById("splitter"),
   viewport: document.getElementById("canvasViewport"),
+  canvasSettingsPanel: document.getElementById("canvasSettingsPanel"),
   svg: document.getElementById("editorSvg"),
+  overlay: document.getElementById("canvasOverlay"),
+  rulerTop: document.getElementById("rulerTop"),
+  rulerLeft: document.getElementById("rulerLeft"),
   scene: document.getElementById("svgScene"),
   defs: document.getElementById("svgDefs"),
   selectionOutline: document.getElementById("selectionOutline"),
@@ -72,6 +77,17 @@ const engine = new SvgEngine({
   history,
 });
 
+new CanvasSettingsPanel({
+  panel: dom.canvasSettingsPanel,
+  eventBus,
+  store,
+  viewport: dom.viewport,
+  svg: dom.svg,
+  overlay: dom.overlay,
+  rulerTop: dom.rulerTop,
+  rulerLeft: dom.rulerLeft,
+});
+
 setupExporters({
   eventBus,
   getMarkup: () => engine.serializeDocument({ pretty: true, inlineStyle: store.getState().inlineStyle }),
@@ -92,7 +108,6 @@ function applyLayoutFromState() {
   dom.appLayout.classList.toggle("code-collapsed", state.codeCollapsed);
   dom.appLayout.classList.toggle("code-fullscreen", state.codeFullscreen);
 
-  dom.viewport.classList.toggle("show-grid", state.showGrid);
   dom.viewport.classList.toggle("show-checker", state.showChecker);
 }
 
@@ -101,9 +116,6 @@ store.subscribe(() => {
 });
 
 eventBus.on("layout:changed", () => applyLayoutFromState());
-eventBus.on("canvas:grid-toggle", ({ enabled }) => {
-  dom.viewport.classList.toggle("show-grid", enabled);
-});
 eventBus.on("canvas:checker-toggle", ({ enabled }) => {
   dom.viewport.classList.toggle("show-checker", enabled);
 });

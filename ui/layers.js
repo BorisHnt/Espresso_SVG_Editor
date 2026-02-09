@@ -1,3 +1,5 @@
+import { ACTION_ICON_MAP, decorateButton, tablerIcon } from "./icons.js";
+
 export class LayersPanel {
   constructor({ root, template, eventBus }) {
     this.root = root;
@@ -30,9 +32,14 @@ export class LayersPanel {
 
         item.dataset.id = layer.id;
         item.classList.toggle("selected", layer.id === this.selectedId);
-        visibility.textContent = layer.hidden ? "H" : "V";
-        lock.textContent = layer.locked ? "L" : "U";
-        select.textContent = `${layer.name} <${layer.tag}>`;
+
+        decorateButton(visibility, layer.hidden ? ACTION_ICON_MAP.hide : ACTION_ICON_MAP.show, "Visibility", { iconOnly: true });
+        decorateButton(lock, layer.locked ? ACTION_ICON_MAP.lock : ACTION_ICON_MAP.unlock, "Lock", { iconOnly: true });
+        decorateButton(up, ACTION_ICON_MAP.up, "Up", { iconOnly: true });
+        decorateButton(down, ACTION_ICON_MAP.down, "Down", { iconOnly: true });
+
+        select.innerHTML = `${tablerIcon("pointer", "", "")}<span class="btn-label"></span>`;
+        select.querySelector(".btn-label").textContent = `${layer.name} <${layer.tag}>`;
 
         select.addEventListener("click", () => {
           this.eventBus.emit("selection:by-id", { id: layer.id });
