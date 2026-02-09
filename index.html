@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ESPRESSO SVG</title>
+  <link rel="stylesheet" href="./styles/main.css" />
+</head>
+<body data-theme="latte">
+  <header class="app-header">
+    <div class="brand-block">
+      <h1>ESPRESSO SVG</h1>
+      <span class="subtitle">Vanilla SVG Editor</span>
+    </div>
+    <div class="header-actions">
+      <button id="themeToggle" class="icon-btn" title="Basculer thème">Latte</button>
+      <button id="undoBtn" class="icon-btn" title="Annuler (Ctrl+Z)">Undo</button>
+      <button id="redoBtn" class="icon-btn" title="Rétablir (Ctrl+Shift+Z)">Redo</button>
+      <button id="importBtn" class="icon-btn" title="Importer SVG">Import</button>
+      <button id="exportSvgBtn" class="icon-btn" title="Exporter SVG">SVG</button>
+      <button id="exportPngBtn" class="icon-btn" title="Exporter PNG">PNG</button>
+      <button id="exportJpgBtn" class="icon-btn" title="Exporter JPG">JPG</button>
+    </div>
+  </header>
+
+  <main id="appLayout" class="app-layout">
+    <section id="workspacePanel" class="workspace-panel">
+      <aside class="tools-panel" aria-label="Outils">
+        <div class="panel-title">Tools</div>
+        <div id="toolButtons" class="tool-buttons" role="toolbar">
+          <button class="tool-btn active" data-tool="select">Select</button>
+          <button class="tool-btn" data-tool="rect">Rect</button>
+          <button class="tool-btn" data-tool="roundRect">RoundRect</button>
+          <button class="tool-btn" data-tool="circle">Circle</button>
+          <button class="tool-btn" data-tool="ellipse">Ellipse</button>
+          <button class="tool-btn" data-tool="line">Line</button>
+          <button class="tool-btn" data-tool="polyline">Polyline</button>
+          <button class="tool-btn" data-tool="polygon">Polygon</button>
+          <button class="tool-btn" data-tool="path">Pen</button>
+          <button class="tool-btn" data-tool="text">Text</button>
+          <button class="tool-btn" data-tool="image">Image</button>
+          <button class="tool-btn" data-tool="group">Group</button>
+          <button class="tool-btn" data-tool="clipPath">Clip</button>
+          <button class="tool-btn" data-tool="mask">Mask</button>
+          <button class="tool-btn" data-tool="symbol">Symbol</button>
+          <button class="tool-btn" data-tool="gradient">Gradient</button>
+          <button class="tool-btn" data-tool="filter">Filter</button>
+        </div>
+      </aside>
+
+      <section class="canvas-stack" aria-label="Zone SVG">
+        <div class="canvas-toolbar">
+          <label class="inline-control">
+            <input id="gridToggle" type="checkbox" checked />
+            Grid
+          </label>
+          <label class="inline-control">
+            <input id="snapToggle" type="checkbox" checked />
+            Snap
+          </label>
+          <label class="inline-control">
+            <input id="checkerToggle" type="checkbox" />
+            Checker
+          </label>
+          <button id="zoomInBtn" class="icon-btn">+</button>
+          <button id="zoomOutBtn" class="icon-btn">-</button>
+          <button id="zoomFitBtn" class="icon-btn">Fit</button>
+          <button id="deleteBtn" class="icon-btn">Delete</button>
+        </div>
+
+        <div id="canvasViewport" class="canvas-viewport show-grid" tabindex="0" aria-label="Canvas SVG">
+          <svg id="editorSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-label="Éditeur SVG">
+            <defs id="svgDefs"></defs>
+            <g id="svgScene"></g>
+          </svg>
+          <div id="selectionOutline" class="selection-outline hidden"></div>
+        </div>
+
+        <div class="bottom-panels">
+          <section class="panel" aria-label="Calques">
+            <div class="panel-title">Layers</div>
+            <div id="layersTree" class="layers-tree"></div>
+          </section>
+          <section class="panel" aria-label="Propriétés">
+            <div class="panel-title">Properties</div>
+            <div id="propertiesPanel" class="properties-panel"></div>
+          </section>
+        </div>
+      </section>
+    </section>
+
+    <div id="splitter" class="splitter" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Redimensionner"></div>
+
+    <section id="codePanel" class="code-panel" aria-label="Code SVG">
+      <header class="code-header">
+        <div class="panel-title">Code SVG</div>
+        <div class="code-actions">
+          <button id="prettyBtn" class="icon-btn">Pretty</button>
+          <button id="minifyBtn" class="icon-btn">Minify</button>
+          <button id="inlineStyleBtn" class="icon-btn">Inline Style</button>
+          <button id="defsViewerBtn" class="icon-btn">Defs</button>
+          <button id="codeCollapseBtn" class="icon-btn">Collapse</button>
+          <button id="codeFullscreenBtn" class="icon-btn">Fullscreen</button>
+        </div>
+      </header>
+
+      <section id="defsViewer" class="defs-viewer hidden" aria-label="Définitions SVG"></section>
+
+      <div class="code-editor-wrap">
+        <pre id="codeHighlight" class="code-highlight" aria-hidden="true"></pre>
+        <textarea id="codeEditor" class="code-editor" spellcheck="false" aria-label="Éditeur code SVG"></textarea>
+      </div>
+      <div id="codeStatus" class="code-status" role="status" aria-live="polite">ready</div>
+    </section>
+  </main>
+
+  <template id="layerItemTemplate">
+    <div class="layer-item" draggable="true">
+      <button class="layer-visibility" title="Afficher/Masquer">V</button>
+      <button class="layer-lock" title="Verrouiller">U</button>
+      <button class="layer-select" title="Sélectionner"></button>
+      <button class="layer-up" title="Monter">Up</button>
+      <button class="layer-down" title="Descendre">Dn</button>
+    </div>
+  </template>
+
+  <input id="fileImportInput" type="file" accept=".svg,image/*" hidden />
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
