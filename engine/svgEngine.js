@@ -171,58 +171,6 @@ export class SvgEngine {
       this.emitSceneChanged("canvas");
     });
 
-    this.eventBus.on("element:rename", ({ id, name }) => {
-      const element = this.scene.querySelector(`#${CSS.escape(id)}`);
-      if (!element) {
-        return;
-      }
-      const before = this.snapshot();
-      element.setAttribute("data-name", name);
-      this.pushSnapshotHistory("Rename layer", before);
-      this.emitSceneChanged("canvas");
-    });
-
-    this.eventBus.on("layer:reorder", ({ id, direction }) => {
-      const target = this.scene.querySelector(`#${CSS.escape(id)}`);
-      if (!target) {
-        return;
-      }
-      const before = this.snapshot();
-      if (direction === "up" && target.previousElementSibling) {
-        this.scene.insertBefore(target, target.previousElementSibling);
-      }
-      if (direction === "down" && target.nextElementSibling) {
-        this.scene.insertBefore(target.nextElementSibling, target);
-      }
-      this.pushSnapshotHistory("Reorder layer", before);
-      this.emitSceneChanged("canvas");
-    });
-
-    this.eventBus.on("layer:visibility", ({ id }) => {
-      const target = this.scene.querySelector(`#${CSS.escape(id)}`);
-      if (!target) {
-        return;
-      }
-      const before = this.snapshot();
-      const hidden = target.getAttribute("data-hidden") === "true";
-      target.setAttribute("data-hidden", String(!hidden));
-      target.style.display = hidden ? "" : "none";
-      this.pushSnapshotHistory("Toggle visibility", before);
-      this.emitSceneChanged("canvas");
-    });
-
-    this.eventBus.on("layer:lock", ({ id }) => {
-      const target = this.scene.querySelector(`#${CSS.escape(id)}`);
-      if (!target) {
-        return;
-      }
-      const before = this.snapshot();
-      const locked = target.getAttribute("data-locked") === "true";
-      target.setAttribute("data-locked", String(!locked));
-      this.pushSnapshotHistory("Toggle lock", before);
-      this.emitSceneChanged("canvas");
-    });
-
     this.eventBus.on("history:undo", () => this.history.undo());
     this.eventBus.on("history:redo", () => this.history.redo());
   }
@@ -291,7 +239,6 @@ export class SvgEngine {
 
     this.syncCanvasConfigFromSvg();
     this.eventBus.emit("defs:changed", this.getDefsSummary());
-    this.eventBus.emit("layers:refresh", this.getLayerModel());
   }
 
   applyRootAttributes(root) {
@@ -1575,17 +1522,6 @@ export class SvgEngine {
     }));
   }
 
-  getLayerModel() {
-    return Array.from(this.scene.children).map((node, index) => ({
-      id: node.id,
-      tag: node.tagName,
-      name: node.getAttribute("data-name") || node.id,
-      hidden: node.getAttribute("data-hidden") === "true",
-      locked: node.getAttribute("data-locked") === "true",
-      index,
-    }));
-  }
-
   serializeDocument(options = { pretty: false, minified: false, inlineStyle: false }) {
     const clone = this.svg.cloneNode(true);
     clone.querySelectorAll(".is-selected").forEach((node) => {
@@ -1685,12 +1621,10 @@ export class SvgEngine {
       source,
       markup,
       selectedId: this.selection.getSelectedId(),
-      layers: this.getLayerModel(),
       defs: this.getDefsSummary(),
       selectionGeometry: this.selection.getSelectedElement() ? getGeometry(this.selection.getSelectedElement()) : null,
     });
 
-    this.eventBus.emit("layers:refresh", this.getLayerModel());
     this.eventBus.emit("defs:changed", this.getDefsSummary());
     this.selection.refreshOutline();
   }
