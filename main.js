@@ -126,27 +126,56 @@ eventBus.on("scene:refresh", () => {
 
 let resizeSession = null;
 
-const startResize = (clientX) => {
+const getSplitBounds = () => {
   const bounds = dom.appLayout.getBoundingClientRect();
-  resizeSession = {
+  const minWorkspace = 320;
+  const minCode = 260;
+
+  let minLeft = bounds.left + minWorkspace;
+  let maxLeft = bounds.left + bounds.width - minCode;
+
+  if (minLeft > maxLeft) {
+    const center = bounds.left + bounds.width / 2;
+    minLeft = center;
+    maxLeft = center;
+  }
+
+  return {
     left: bounds.left,
     width: bounds.width,
+    minLeft,
+    maxLeft,
+  };
+};
+
+const startResize = (clientX) => {
+  const splitBounds = getSplitBounds();
+  resizeSession = {
+    ...splitBounds,
     startX: clientX,
   };
+  document.body.style.userSelect = "none";
 };
 
 const moveResize = (clientX) => {
   if (!resizeSession) {
     return;
   }
-  const cursorX = Math.min(Math.max(clientX, resizeSession.left + 280), resizeSession.left + resizeSession.width - 280);
+  const cursorX = Math.min(Math.max(clientX, resizeSession.minLeft), resizeSession.maxLeft);
   const codeWidthPx = resizeSession.left + resizeSession.width - cursorX;
   const codeWidthPct = (codeWidthPx / resizeSession.width) * 100;
   store.set({ codeWidth: Number(codeWidthPct.toFixed(1)), codeCollapsed: false });
 };
 
 dom.splitter.addEventListener("pointerdown", (event) => {
+  if (store.getState().codeFullscreen) {
+    return;
+  }
+  event.preventDefault();
   startResize(event.clientX);
+  if (dom.splitter.setPointerCapture) {
+    dom.splitter.setPointerCapture(event.pointerId);
+  }
 });
 
 window.addEventListener("pointermove", (event) => {
@@ -155,14 +184,27 @@ window.addEventListener("pointermove", (event) => {
 
 window.addEventListener("pointerup", () => {
   resizeSession = null;
+  document.body.style.userSelect = "";
+});
+
+window.addEventListener("pointercancel", () => {
+  resizeSession = null;
+  document.body.style.userSelect = "";
 });
 
 dom.splitter.addEventListener("keydown", (event) => {
+  const splitBounds = getSplitBounds();
+  const currentCodeWidthPx = (store.getState().codeWidth / 100) * splitBounds.width;
+  const minCodeWidthPx = splitBounds.left + splitBounds.width - splitBounds.maxLeft;
+  const maxCodeWidthPx = splitBounds.left + splitBounds.width - splitBounds.minLeft;
+
   if (event.key === "ArrowLeft") {
-    store.set({ codeWidth: Math.min(store.getState().codeWidth + 2, 60), codeCollapsed: false });
+    const nextCode = Math.min(maxCodeWidthPx, currentCodeWidthPx + 24);
+    store.set({ codeWidth: Number(((nextCode / splitBounds.width) * 100).toFixed(1)), codeCollapsed: false });
   }
   if (event.key === "ArrowRight") {
-    store.set({ codeWidth: Math.max(store.getState().codeWidth - 2, 20), codeCollapsed: false });
+    const nextCode = Math.max(minCodeWidthPx, currentCodeWidthPx - 24);
+    store.set({ codeWidth: Number(((nextCode / splitBounds.width) * 100).toFixed(1)), codeCollapsed: false });
   }
 });
 

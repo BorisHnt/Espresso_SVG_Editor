@@ -395,7 +395,7 @@ export class CanvasSettingsPanel {
     return sanitizeConfig(this.store.getState().canvas);
   }
 
-  updateConfig(partial, source = "panel", recordHistory = true, notify = true) {
+  updateConfig(partial, source = "panel", recordHistory = true, notify = true, renderUi = true) {
     const current = this.getConfig();
     const next = clone(current);
 
@@ -466,7 +466,11 @@ export class CanvasSettingsPanel {
       { silent: !notify },
     );
 
-    this.renderFromState();
+    if (renderUi) {
+      this.renderFromState();
+    } else {
+      this.renderOverlay();
+    }
     this.emitApplyConfig(source, recordHistory);
   }
 
@@ -684,7 +688,7 @@ export class CanvasSettingsPanel {
         position: round(value, 2),
       };
     });
-    this.updateConfig({ guides: nextGuides }, "guide-move", false, false);
+    this.updateConfig({ guides: nextGuides }, "guide-move", false, false, false);
   }
 
   renderGuideList() {
@@ -1001,6 +1005,7 @@ export class CanvasSettingsPanel {
     event.preventDefault();
     event.stopPropagation();
     this.guideDrag = { guideId, orientation };
+    document.body.style.userSelect = "none";
 
     const onMove = (moveEvent) => {
       if (!this.guideDrag) {
@@ -1015,10 +1020,14 @@ export class CanvasSettingsPanel {
       this.guideDrag = null;
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      document.body.style.userSelect = "";
+      this.renderFromState();
     };
 
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   }
 
   startResizeDrag(event, mode) {
@@ -1034,7 +1043,10 @@ export class CanvasSettingsPanel {
       unit: config.unit,
       dpi: config.dpi,
       viewBox: config.viewBox,
+      snap: config.grid.snap,
+      snapStep: Math.max(1, config.grid.spacing),
     };
+    document.body.style.userSelect = "none";
 
     const onMove = (moveEvent) => {
       if (!this.resizeDrag) {
@@ -1054,6 +1066,11 @@ export class CanvasSettingsPanel {
         heightPx = Math.max(8, this.resizeDrag.startHeightPx + dy);
       }
 
+      if (this.resizeDrag.snap) {
+        widthPx = Math.max(8, Math.round(widthPx / this.resizeDrag.snapStep) * this.resizeDrag.snapStep);
+        heightPx = Math.max(8, Math.round(heightPx / this.resizeDrag.snapStep) * this.resizeDrag.snapStep);
+      }
+
       const width = fromPx(widthPx, this.resizeDrag.unit, this.resizeDrag.dpi);
       const height = fromPx(heightPx, this.resizeDrag.unit, this.resizeDrag.dpi);
 
@@ -1070,6 +1087,7 @@ export class CanvasSettingsPanel {
         "resize-handle",
         false,
         false,
+        false,
       );
     };
 
@@ -1077,9 +1095,13 @@ export class CanvasSettingsPanel {
       this.resizeDrag = null;
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      document.body.style.userSelect = "";
+      this.renderFromState();
     };
 
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   }
 }
