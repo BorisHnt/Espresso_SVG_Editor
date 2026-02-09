@@ -428,7 +428,8 @@ textarea:focus-visible {
 }
 
 #canvasOverlay .guide-line,
-#canvasOverlay .resize-handle {
+#canvasOverlay .resize-handle,
+#canvasOverlay .resize-edge {
   pointer-events: all;
 }
 
@@ -489,12 +490,46 @@ textarea:focus-visible {
   cursor: nwse-resize;
 }
 
+#canvasOverlay .resize-edge {
+  fill: transparent;
+}
+
+#canvasOverlay .resize-edge.edge-e {
+  cursor: ew-resize;
+}
+
+#canvasOverlay .resize-edge.edge-s {
+  cursor: ns-resize;
+}
+
+#canvasOverlay .frame-outline {
+  fill: none;
+  stroke: color-mix(in srgb, var(--primary) 64%, transparent 36%);
+  stroke-width: 0.9;
+  stroke-dasharray: 4 3;
+}
+
+#canvasOverlay .resize-handle.handle-n,
+#canvasOverlay .resize-handle.handle-s {
+  cursor: ns-resize;
+}
+
 #canvasOverlay .resize-handle.handle-e {
   cursor: ew-resize;
 }
 
-#canvasOverlay .resize-handle.handle-s {
-  cursor: ns-resize;
+#canvasOverlay .resize-handle.handle-w {
+  cursor: ew-resize;
+}
+
+#canvasOverlay .resize-handle.handle-ne,
+#canvasOverlay .resize-handle.handle-sw {
+  cursor: nesw-resize;
+}
+
+#canvasOverlay .resize-handle.handle-nw,
+#canvasOverlay .resize-handle.handle-se {
+  cursor: nwse-resize;
 }
 
 .ruler {

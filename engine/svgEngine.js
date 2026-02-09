@@ -82,6 +82,7 @@ export class SvgEngine {
 
     this.currentTool = store.getState().tool;
     this.pointerAction = null;
+    this.pathSession = null;
     this.nodeCounter = 0;
 
     this.#bindEvents();
@@ -96,11 +97,16 @@ export class SvgEngine {
 
   #bindEvents() {
     this.svg.addEventListener("pointerdown", (event) => this.onPointerDown(event));
+    this.svg.addEventListener("dblclick", (event) => this.onDoubleClick(event));
     window.addEventListener("pointermove", (event) => this.onPointerMove(event));
     window.addEventListener("pointerup", (event) => this.onPointerUp(event));
+    window.addEventListener("keydown", (event) => this.onWindowKeyDown(event));
     this.viewport.addEventListener("wheel", (event) => this.onWheel(event), { passive: false });
 
     this.eventBus.on("tool:changed", ({ tool }) => {
+      if (this.currentTool === "path" && tool !== "path" && this.pathSession) {
+        this.finalizePathSession({ close: false });
+      }
       this.currentTool = tool;
     });
 
@@ -114,6 +120,10 @@ export class SvgEngine {
 
     this.eventBus.on("selection:delete", () => {
       this.deleteSelection();
+    });
+
+    this.eventBus.on("scene:reset", () => {
+      this.resetDocument();
     });
 
     this.eventBus.on("view:zoom-in", () => this.zoomBy(1.2));
@@ -242,6 +252,7 @@ export class SvgEngine {
   }
 
   importSvgRoot(root) {
+    this.pathSession = null;
     this.scene.innerHTML = "";
     const incomingDefs = root.querySelector("defs");
     this.defs.innerHTML = incomingDefs ? incomingDefs.innerHTML : "";
@@ -406,6 +417,11 @@ export class SvgEngine {
       return;
     }
 
+    if (this.currentTool === "path") {
+      this.handlePathPointerDown(point, event);
+      return;
+    }
+
     if (this.isActionTool(this.currentTool)) {
       this.runActionTool(this.currentTool);
       return;
@@ -430,6 +446,16 @@ export class SvgEngine {
   }
 
   onPointerMove(event) {
+    if (this.currentTool === "path" && this.pathSession && (!this.pointerAction || this.pointerAction.type !== "pan")) {
+      const rawPoint = this.clientToSvg(event.clientX, event.clientY);
+      const canvasConfig = this.getCanvasConfig();
+      const snapEnabled = canvasConfig.grid?.snap ?? this.store.getState().snapEnabled;
+      const spacing = canvasConfig.grid?.spacing ?? 10;
+      const point = snapPoint(rawPoint, spacing, snapEnabled);
+      this.pathSession.preview = point;
+      this.renderPathSession();
+    }
+
     if (!this.pointerAction) {
       return;
     }
@@ -476,13 +502,7 @@ export class SvgEngine {
 
     if (this.pointerAction.type === "draw") {
       const { tool, element, start } = this.pointerAction;
-      if (tool === "path") {
-        this.pointerAction.points.push(point);
-        const points = this.pathEditor.simplify(this.pointerAction.points, 2);
-        element.setAttribute("d", this.pathEditor.toPathData(points, false));
-      } else {
-        this.updateDraftElement(tool, element, start, point, event.shiftKey);
-      }
+      this.updateDraftElement(tool, element, start, point, event.shiftKey);
       this.selection.refreshOutline();
     }
   }
@@ -509,6 +529,145 @@ export class SvgEngine {
     }
 
     this.pointerAction = null;
+  }
+
+  onDoubleClick(event) {
+    if (this.currentTool !== "path" || !this.pathSession) {
+      return;
+    }
+    event.preventDefault();
+    this.finalizePathSession({ close: false });
+  }
+
+  onWindowKeyDown(event) {
+    if (this.currentTool !== "path" || !this.pathSession) {
+      return;
+    }
+
+    const targetTag = event.target?.tagName?.toLowerCase?.() || "";
+    if (["input", "textarea", "select"].includes(targetTag) || event.target?.isContentEditable) {
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      this.finalizePathSession({ cancel: true });
+      return;
+    }
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      this.finalizePathSession({ close: event.shiftKey });
+    }
+  }
+
+  handlePathPointerDown(point, event) {
+    if (!this.pathSession) {
+      const before = this.snapshot();
+      const path = document.createElementNS(SVG_NS, "path");
+      this.assignNodeId(path);
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", "#4a4947");
+      path.setAttribute("stroke-width", "2");
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("stroke-linejoin", "round");
+      path.setAttribute("d", `M ${point.x} ${point.y}`);
+      this.scene.append(path);
+      this.selection.select(path);
+
+      this.pathSession = {
+        element: path,
+        points: [point],
+        preview: null,
+        before,
+      };
+      return;
+    }
+
+    const session = this.pathSession;
+    const last = session.points[session.points.length - 1];
+    let nextPoint = point;
+
+    if (event.shiftKey && last) {
+      const dx = Math.abs(point.x - last.x);
+      const dy = Math.abs(point.y - last.y);
+      nextPoint = dx >= dy ? { x: point.x, y: last.y } : { x: last.x, y: point.y };
+    }
+
+    const first = session.points[0];
+    const canvasConfig = this.getCanvasConfig();
+    const closeThreshold = Math.max(6, canvasConfig.grid?.spacing ?? 10);
+    if (session.points.length >= 3 && Math.hypot(nextPoint.x - first.x, nextPoint.y - first.y) <= closeThreshold) {
+      this.finalizePathSession({ close: true });
+      return;
+    }
+
+    session.points.push(nextPoint);
+    session.preview = null;
+    this.renderPathSession();
+  }
+
+  renderPathSession() {
+    if (!this.pathSession) {
+      return;
+    }
+    const { element, points, preview } = this.pathSession;
+    const drawPoints = preview ? [...points, preview] : points;
+    const simplified = this.pathEditor.simplify(drawPoints, 0.6);
+    element.setAttribute("d", this.pathEditor.toPathData(simplified, false));
+    this.selection.refreshOutline();
+  }
+
+  finalizePathSession({ close = false, cancel = false } = {}) {
+    if (!this.pathSession) {
+      return;
+    }
+
+    const { element, points, before } = this.pathSession;
+
+    if (cancel || points.length < 2) {
+      element.remove();
+      this.pathSession = null;
+      this.selection.clear();
+      this.emitSceneChanged("canvas");
+      return;
+    }
+
+    const simplified = this.pathEditor.simplify(points, 0.6);
+    element.setAttribute("d", this.pathEditor.toPathData(simplified, close));
+    this.pathSession = null;
+
+    this.pushSnapshotHistory("Draw path", before);
+    this.emitSceneChanged("canvas");
+  }
+
+  resetDocument() {
+    this.finalizePathSession({ cancel: true });
+    const defaults = getDefaultCanvasConfig();
+
+    this.scene.innerHTML = "";
+    this.defs.innerHTML = "";
+    this.seedDocument();
+    this.selection.clear({ silent: true });
+
+    this.store.set(
+      {
+        canvas: defaults,
+        showGrid: defaults.grid.enabled,
+        snapEnabled: defaults.grid.snap,
+        selectedId: null,
+      },
+      { silent: true },
+    );
+
+    this.applyCanvasConfig(defaults, {
+      source: "reset",
+      recordHistory: false,
+      emitScene: false,
+    });
+
+    this.history.clear();
+    this.emitSceneChanged("reset");
   }
 
   onWheel(event) {
@@ -760,6 +919,10 @@ export class SvgEngine {
   deleteSelection() {
     const selected = this.selection.getSelectedElement();
     if (!selected) {
+      return;
+    }
+    if (this.pathSession && this.pathSession.element === selected) {
+      this.finalizePathSession({ cancel: true });
       return;
     }
     const before = this.snapshot();

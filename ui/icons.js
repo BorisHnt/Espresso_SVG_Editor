@@ -28,6 +28,7 @@ export const ACTION_ICON_MAP = {
   undo: "arrow-back-up",
   redo: "arrow-forward-up",
   import: "file-import",
+  resetCanvas: "trash",
   exportSvg: "file-type-svg",
   exportPng: "file-type-png",
   exportJpg: "file-type-jpg",

@@ -865,7 +865,37 @@ export class CanvasSettingsPanel {
     const viewBox = config.viewBox;
 
     const ratio = viewBox.width / Math.max(this.viewport.clientWidth, 1);
-    const size = Math.max(8 * ratio, 3.5);
+    const size = Math.max(11 * ratio, 4.2);
+
+    const frame = document.createElementNS(SVG_NS, "rect");
+    frame.setAttribute("x", 0);
+    frame.setAttribute("y", 0);
+    frame.setAttribute("width", round(widthPx, 3));
+    frame.setAttribute("height", round(heightPx, 3));
+    frame.setAttribute("class", "frame-outline");
+    this.resizeLayer.append(frame);
+
+    const edgeHit = Math.max(size * 1.1, 8);
+
+    const edgeE = document.createElementNS(SVG_NS, "rect");
+    edgeE.setAttribute("x", round(widthPx - edgeHit / 2, 3));
+    edgeE.setAttribute("y", round(0, 3));
+    edgeE.setAttribute("width", round(edgeHit, 3));
+    edgeE.setAttribute("height", round(heightPx, 3));
+    edgeE.setAttribute("class", "resize-edge edge-e");
+    edgeE.dataset.mode = "e";
+    edgeE.addEventListener("pointerdown", (event) => this.startResizeDrag(event, "e"));
+    this.resizeLayer.append(edgeE);
+
+    const edgeS = document.createElementNS(SVG_NS, "rect");
+    edgeS.setAttribute("x", round(0, 3));
+    edgeS.setAttribute("y", round(heightPx - edgeHit / 2, 3));
+    edgeS.setAttribute("width", round(widthPx, 3));
+    edgeS.setAttribute("height", round(edgeHit, 3));
+    edgeS.setAttribute("class", "resize-edge edge-s");
+    edgeS.dataset.mode = "s";
+    edgeS.addEventListener("pointerdown", (event) => this.startResizeDrag(event, "s"));
+    this.resizeLayer.append(edgeS);
 
     const handles = [
       { mode: "e", x: widthPx, y: heightPx / 2 },
@@ -1040,6 +1070,7 @@ export class CanvasSettingsPanel {
       startPoint: this.clientToSvg(event.clientX, event.clientY),
       startWidthPx: toPx(config.width, config.unit, config.dpi),
       startHeightPx: toPx(config.height, config.unit, config.dpi),
+      aspectRatio: toPx(config.width, config.unit, config.dpi) / Math.max(1, toPx(config.height, config.unit, config.dpi)),
       unit: config.unit,
       dpi: config.dpi,
       viewBox: config.viewBox,
@@ -1062,8 +1093,27 @@ export class CanvasSettingsPanel {
       if (this.resizeDrag.mode.includes("e")) {
         widthPx = Math.max(8, this.resizeDrag.startWidthPx + dx);
       }
+      if (this.resizeDrag.mode.includes("w")) {
+        widthPx = Math.max(8, this.resizeDrag.startWidthPx - dx);
+      }
       if (this.resizeDrag.mode.includes("s")) {
         heightPx = Math.max(8, this.resizeDrag.startHeightPx + dy);
+      }
+      if (this.resizeDrag.mode.includes("n")) {
+        heightPx = Math.max(8, this.resizeDrag.startHeightPx - dy);
+      }
+
+      if (moveEvent.shiftKey) {
+        const ratio = this.resizeDrag.aspectRatio || 1;
+        const widthBasedHeight = widthPx / ratio;
+        const heightBasedWidth = heightPx * ratio;
+        const widthDiff = Math.abs(widthPx - this.resizeDrag.startWidthPx);
+        const heightDiff = Math.abs(heightPx - this.resizeDrag.startHeightPx);
+        if (widthDiff >= heightDiff) {
+          heightPx = Math.max(8, widthBasedHeight);
+        } else {
+          widthPx = Math.max(8, heightBasedWidth);
+        }
       }
 
       if (this.resizeDrag.snap) {

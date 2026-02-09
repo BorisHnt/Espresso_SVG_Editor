@@ -61,6 +61,12 @@ export class HistoryManager {
     }));
   }
 
+  clear() {
+    this.undoStack = [];
+    this.redoStack = [];
+    this.#emit();
+  }
+
   #emit() {
     this.eventBus.emit("history:changed", {
       canUndo: this.canUndo(),

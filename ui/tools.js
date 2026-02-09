@@ -20,6 +20,7 @@ export class ToolsPanel {
     decorateButton(document.getElementById("undoBtn"), ACTION_ICON_MAP.undo, "Undo", { iconOnly: true });
     decorateButton(document.getElementById("redoBtn"), ACTION_ICON_MAP.redo, "Redo", { iconOnly: true });
     decorateButton(document.getElementById("importBtn"), ACTION_ICON_MAP.import, "Import", { iconOnly: true });
+    decorateButton(document.getElementById("resetCanvasBtn"), ACTION_ICON_MAP.resetCanvas, "Reset", { iconOnly: true });
     decorateButton(document.getElementById("exportSvgBtn"), ACTION_ICON_MAP.exportSvg, "SVG", { iconOnly: true });
     decorateButton(document.getElementById("exportPngBtn"), ACTION_ICON_MAP.exportPng, "PNG", { iconOnly: true });
     decorateButton(document.getElementById("exportJpgBtn"), ACTION_ICON_MAP.exportJpg, "JPG", { iconOnly: true });
@@ -54,6 +55,13 @@ export class ToolsPanel {
 
     document.getElementById("undoBtn").addEventListener("click", () => this.eventBus.emit("history:undo"));
     document.getElementById("redoBtn").addEventListener("click", () => this.eventBus.emit("history:redo"));
+    document.getElementById("resetCanvasBtn").addEventListener("click", () => {
+      const approved = window.confirm("Remettre le canvas et le document a zero ?");
+      if (!approved) {
+        return;
+      }
+      this.eventBus.emit("scene:reset");
+    });
 
     window.addEventListener("keydown", (event) => this.onKeyDown(event));
     this.store.subscribe((state) => this.applyState(state));
