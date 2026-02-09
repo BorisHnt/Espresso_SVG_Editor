@@ -7,6 +7,25 @@ export class SelectionManager {
     this.eventBus = eventBus;
     this.store = store;
     this.current = null;
+    this.rotateHandle = null;
+
+    this.setupOutlineControls();
+  }
+
+  setupOutlineControls() {
+    this.outline.innerHTML = "";
+
+    const stem = document.createElement("div");
+    stem.className = "selection-rotate-stem";
+
+    const handle = document.createElement("button");
+    handle.type = "button";
+    handle.className = "selection-rotate-handle";
+    handle.setAttribute("aria-label", "Rotate selection");
+    handle.title = "Rotate selection (Shift: snap 15deg)";
+
+    this.outline.append(stem, handle);
+    this.rotateHandle = handle;
   }
 
   getSelectedElement() {
@@ -15,6 +34,17 @@ export class SelectionManager {
 
   getSelectedId() {
     return this.current?.id || null;
+  }
+
+  isRotateHandleTarget(target) {
+    if (!(target instanceof Element)) {
+      return false;
+    }
+    return Boolean(target.closest(".selection-rotate-handle"));
+  }
+
+  setRotating(isRotating) {
+    this.outline.classList.toggle("is-rotating", Boolean(isRotating));
   }
 
   select(element, options = { silent: false }) {
@@ -35,6 +65,7 @@ export class SelectionManager {
       this.refreshOutline();
     } else {
       this.outline.classList.add("hidden");
+      this.setRotating(false);
     }
 
     this.store.set({ selectedId: this.current?.id ?? null }, { silent: options.silent });
@@ -63,27 +94,14 @@ export class SelectionManager {
     if (!this.current) {
       return;
     }
-
-    const bbox = this.current.getBBox();
-    const ctm = this.current.getScreenCTM();
-    if (!ctm) {
-      return;
-    }
-
-    const topLeft = this.svg.createSVGPoint();
-    topLeft.x = bbox.x;
-    topLeft.y = bbox.y;
-    const bottomRight = this.svg.createSVGPoint();
-    bottomRight.x = bbox.x + bbox.width;
-    bottomRight.y = bbox.y + bbox.height;
-
-    const p1 = topLeft.matrixTransform(ctm);
-    const p2 = bottomRight.matrixTransform(ctm);
-
     const viewportRect = this.viewport.getBoundingClientRect();
-    this.outline.style.left = `${Math.min(p1.x, p2.x) - viewportRect.left}px`;
-    this.outline.style.top = `${Math.min(p1.y, p2.y) - viewportRect.top}px`;
-    this.outline.style.width = `${Math.abs(p2.x - p1.x)}px`;
-    this.outline.style.height = `${Math.abs(p2.y - p1.y)}px`;
+    const elementRect = this.current.getBoundingClientRect();
+    const width = Math.max(1, elementRect.width);
+    const height = Math.max(1, elementRect.height);
+
+    this.outline.style.left = `${elementRect.left - viewportRect.left}px`;
+    this.outline.style.top = `${elementRect.top - viewportRect.top}px`;
+    this.outline.style.width = `${width}px`;
+    this.outline.style.height = `${height}px`;
   }
 }

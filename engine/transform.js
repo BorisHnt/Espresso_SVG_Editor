@@ -21,6 +21,16 @@ function translateViaTransform(element, dx, dy) {
   element.setAttribute("transform", translated);
 }
 
+function formatNumber(value) {
+  return Number(Number(value).toFixed(2));
+}
+
+export function rotateViaTransform(element, angleDeg, cx, cy) {
+  const previous = element.getAttribute("transform") || "";
+  const rotate = `rotate(${formatNumber(angleDeg)} ${formatNumber(cx)} ${formatNumber(cy)})`;
+  element.setAttribute("transform", `${previous} ${rotate}`.trim());
+}
+
 export function translateElement(element, dx, dy) {
   const tag = element.tagName.toLowerCase();
 

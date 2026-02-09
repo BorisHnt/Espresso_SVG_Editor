@@ -620,6 +620,36 @@ textarea:focus-visible {
   z-index: 30;
 }
 
+.selection-rotate-stem {
+  position: absolute;
+  left: 50%;
+  top: -16px;
+  width: 1px;
+  height: 10px;
+  transform: translateX(-50%);
+  background: color-mix(in srgb, var(--primary) 72%, transparent 28%);
+  pointer-events: none;
+}
+
+.selection-rotate-handle {
+  position: absolute;
+  left: 50%;
+  top: -28px;
+  width: 14px;
+  height: 14px;
+  transform: translateX(-50%);
+  border: 1px solid var(--primary);
+  border-radius: 50%;
+  background: var(--bg-panel);
+  padding: 0;
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.selection-outline.is-rotating .selection-rotate-handle {
+  cursor: grabbing;
+}
+
 .hidden {
   display: none !important;
 }

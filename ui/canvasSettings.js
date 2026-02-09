@@ -1156,16 +1156,11 @@ export class CanvasSettingsPanel {
     event.stopPropagation();
 
     const config = this.getConfig();
-    const viewportWidth = Math.max(this.viewport.clientWidth, 1);
-    const viewportHeight = Math.max(this.viewport.clientHeight, 1);
-    const unitsPerClientX = config.viewBox.width / viewportWidth;
-    const unitsPerClientY = config.viewBox.height / viewportHeight;
+    const startPoint = this.clientToSvg(event.clientX, event.clientY);
 
     this.resizeDrag = {
       mode,
-      startClient: { x: event.clientX, y: event.clientY },
-      unitsPerClientX,
-      unitsPerClientY,
+      startPoint,
       startWidthPx: toPx(config.width, config.unit, config.dpi),
       startHeightPx: toPx(config.height, config.unit, config.dpi),
       aspectRatio: toPx(config.width, config.unit, config.dpi) / Math.max(1, toPx(config.height, config.unit, config.dpi)),
@@ -1181,25 +1176,24 @@ export class CanvasSettingsPanel {
       if (!this.resizeDrag) {
         return;
       }
-      const dxClient = moveEvent.clientX - this.resizeDrag.startClient.x;
-      const dyClient = moveEvent.clientY - this.resizeDrag.startClient.y;
-      const dx = dxClient * this.resizeDrag.unitsPerClientX;
-      const dy = dyClient * this.resizeDrag.unitsPerClientY;
+      const currentPoint = this.clientToSvg(moveEvent.clientX, moveEvent.clientY);
+      const dx = currentPoint.x - this.resizeDrag.startPoint.x;
+      const dy = currentPoint.y - this.resizeDrag.startPoint.y;
 
       let widthPx = this.resizeDrag.startWidthPx;
       let heightPx = this.resizeDrag.startHeightPx;
 
       if (this.resizeDrag.mode.includes("e")) {
-        widthPx = Math.max(8, this.resizeDrag.startWidthPx + dx);
+        widthPx = Math.max(1, this.resizeDrag.startWidthPx + dx);
       }
       if (this.resizeDrag.mode.includes("w")) {
-        widthPx = Math.max(8, this.resizeDrag.startWidthPx - dx);
+        widthPx = Math.max(1, this.resizeDrag.startWidthPx - dx);
       }
       if (this.resizeDrag.mode.includes("s")) {
-        heightPx = Math.max(8, this.resizeDrag.startHeightPx + dy);
+        heightPx = Math.max(1, this.resizeDrag.startHeightPx + dy);
       }
       if (this.resizeDrag.mode.includes("n")) {
-        heightPx = Math.max(8, this.resizeDrag.startHeightPx - dy);
+        heightPx = Math.max(1, this.resizeDrag.startHeightPx - dy);
       }
 
       if (moveEvent.shiftKey) {
@@ -1209,15 +1203,15 @@ export class CanvasSettingsPanel {
         const widthDiff = Math.abs(widthPx - this.resizeDrag.startWidthPx);
         const heightDiff = Math.abs(heightPx - this.resizeDrag.startHeightPx);
         if (widthDiff >= heightDiff) {
-          heightPx = Math.max(8, widthBasedHeight);
+          heightPx = Math.max(1, widthBasedHeight);
         } else {
-          widthPx = Math.max(8, heightBasedWidth);
+          widthPx = Math.max(1, heightBasedWidth);
         }
       }
 
       if (this.resizeDrag.snap) {
-        widthPx = Math.max(8, Math.round(widthPx / this.resizeDrag.snapStep) * this.resizeDrag.snapStep);
-        heightPx = Math.max(8, Math.round(heightPx / this.resizeDrag.snapStep) * this.resizeDrag.snapStep);
+        widthPx = Math.max(1, Math.round(widthPx / this.resizeDrag.snapStep) * this.resizeDrag.snapStep);
+        heightPx = Math.max(1, Math.round(heightPx / this.resizeDrag.snapStep) * this.resizeDrag.snapStep);
       }
 
       const width = fromPx(widthPx, this.resizeDrag.unit, this.resizeDrag.dpi);

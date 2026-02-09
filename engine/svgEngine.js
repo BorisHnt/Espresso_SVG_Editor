@@ -3,7 +3,7 @@ import { getDefaultCanvasConfig } from "../core/state.js";
 import { PathEditor } from "./pathEditor.js";
 import { SelectionManager } from "./selection.js";
 import { snapPoint } from "./snapping.js";
-import { applyGeometry, getGeometry, translateElement } from "./transform.js";
+import { applyGeometry, getGeometry, rotateViaTransform, translateElement } from "./transform.js";
 import { formatXml, minifyXml } from "../utils/xml.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -67,6 +67,7 @@ export class SvgEngine {
     this.scene = scene;
     this.defs = defs;
     this.viewport = viewport;
+    this.selectionOutline = selectionOutline;
     this.pathEditorLayer = pathEditorLayer;
     this.eventBus = eventBus;
     this.store = store;
@@ -99,6 +100,7 @@ export class SvgEngine {
 
   #bindEvents() {
     this.svg.addEventListener("pointerdown", (event) => this.onPointerDown(event));
+    this.selectionOutline.addEventListener("pointerdown", (event) => this.onSelectionOutlinePointerDown(event));
     this.svg.addEventListener("dblclick", (event) => this.onDoubleClick(event));
     if (this.pathEditorLayer) {
       this.pathEditorLayer.addEventListener("pointerdown", (event) => this.onPathOverlayPointerDown(event));
@@ -357,6 +359,37 @@ export class SvgEngine {
     this.eventBus.emit("canvas:viewbox:changed", { viewBox });
   }
 
+  onSelectionOutlinePointerDown(event) {
+    if (event.button !== 0 || !this.selection.isRotateHandleTarget(event.target)) {
+      return;
+    }
+
+    const element = this.selection.getSelectedElement();
+    if (!element || this.isLocked(element)) {
+      return;
+    }
+
+    const center = this.getElementCenterPoint(element);
+    if (!center) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    this.pointerAction = {
+      type: "rotate",
+      element,
+      original: element.cloneNode(true),
+      before: this.snapshot(),
+      centerScreen: center.client,
+      centerSvg: center.svg,
+      startAngle: this.computeAngle(center.client, { x: event.clientX, y: event.clientY }),
+    };
+
+    this.selection.setRotating(true);
+  }
+
   onPointerDown(event) {
     if (event.button !== 0 && event.button !== 1) {
       return;
@@ -479,6 +512,20 @@ export class SvgEngine {
       return;
     }
 
+    if (this.pointerAction.type === "rotate") {
+      const action = this.pointerAction;
+      const currentAngle = this.computeAngle(action.centerScreen, { x: event.clientX, y: event.clientY });
+      let deltaDeg = this.normalizeAngleDeg(this.radToDeg(currentAngle - action.startAngle));
+      if (event.shiftKey) {
+        deltaDeg = Math.round(deltaDeg / 15) * 15;
+      }
+
+      this.cloneAttributes(action.original, action.element);
+      rotateViaTransform(action.element, deltaDeg, action.centerSvg.x, action.centerSvg.y);
+      this.selection.refreshOutline();
+      return;
+    }
+
     const rawPoint = this.clientToSvg(event.clientX, event.clientY);
     const canvasConfig = this.getCanvasConfig();
     const snapEnabled = canvasConfig.grid?.snap ?? this.store.getState().snapEnabled;
@@ -538,6 +585,13 @@ export class SvgEngine {
       this.emitSceneChanged("canvas");
     }
 
+    if (this.pointerAction.type === "rotate") {
+      const { before } = this.pointerAction;
+      this.pushSnapshotHistory("Rotate element", before);
+      this.emitSceneChanged("canvas");
+      this.selection.setRotating(false);
+    }
+
     this.pointerAction = null;
   }
 
@@ -583,7 +637,37 @@ export class SvgEngine {
       }
     }
 
+    if (this.handleKeyboardRotate(event)) {
+      return;
+    }
+
     this.handleKeyboardNudge(event);
+  }
+
+  handleKeyboardRotate(event) {
+    const selected = this.selection.getSelectedElement();
+    if (!selected || this.isLocked(selected)) {
+      return false;
+    }
+
+    if (event.key !== "[" && event.key !== "]") {
+      return false;
+    }
+
+    event.preventDefault();
+    const step = event.shiftKey ? 15 : 1;
+    const delta = event.key === "]" ? step : -step;
+    const center = this.getElementCenterPoint(selected);
+    if (!center) {
+      return true;
+    }
+
+    const before = this.snapshot();
+    rotateViaTransform(selected, delta, center.svg.x, center.svg.y);
+    this.selection.refreshOutline();
+    this.pushSnapshotHistory("Rotate element", before);
+    this.emitSceneChanged("canvas");
+    return true;
   }
 
   handleKeyboardNudge(event) {
@@ -1399,6 +1483,42 @@ export class SvgEngine {
     }
     const local = point.matrixTransform(ctm.inverse());
     return { x: Number(local.x.toFixed(2)), y: Number(local.y.toFixed(2)) };
+  }
+
+  getElementCenterPoint(element) {
+    const rect = element.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) {
+      return null;
+    }
+
+    const centerClient = {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
+
+    return {
+      client: centerClient,
+      svg: this.clientToSvg(centerClient.x, centerClient.y),
+    };
+  }
+
+  computeAngle(center, point) {
+    return Math.atan2(point.y - center.y, point.x - center.x);
+  }
+
+  radToDeg(value) {
+    return (value * 180) / Math.PI;
+  }
+
+  normalizeAngleDeg(value) {
+    let angle = value;
+    while (angle <= -180) {
+      angle += 360;
+    }
+    while (angle > 180) {
+      angle -= 360;
+    }
+    return angle;
   }
 
   cloneAttributes(source, target) {
