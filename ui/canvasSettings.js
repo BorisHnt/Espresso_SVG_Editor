@@ -92,6 +92,7 @@ function sanitizeConfig(input) {
     },
     rulers: Boolean(config.rulers ?? defaults.rulers),
     guidesVisible: Boolean(config.guidesVisible ?? defaults.guidesVisible),
+    zonesVisible: Boolean(config.zonesVisible ?? defaults.zonesVisible),
     guides: Array.isArray(config.guides)
       ? config.guides
           .map((guide, index) => ({
@@ -146,6 +147,7 @@ export class CanvasSettingsPanel {
       panelSnapToggle: document.getElementById("panelSnapToggle"),
       panelRulerToggle: document.getElementById("panelRulerToggle"),
       panelGuidesVisibleToggle: document.getElementById("panelGuidesVisibleToggle"),
+      panelZonesToggle: document.getElementById("panelZonesToggle"),
       panelGridSpacing: document.getElementById("panelGridSpacingInput"),
       panelGridSubdiv: document.getElementById("panelGridSubdivInput"),
 
@@ -314,6 +316,9 @@ export class CanvasSettingsPanel {
     this.controls.panelGuidesVisibleToggle.addEventListener("change", () => {
       this.updateConfig({ guidesVisible: this.controls.panelGuidesVisibleToggle.checked }, "panel-guides", false);
     });
+    this.controls.panelZonesToggle.addEventListener("change", () => {
+      this.updateConfig({ zonesVisible: this.controls.panelZonesToggle.checked }, "panel-zones", false);
+    });
 
     this.bindNumberField(this.controls.panelGridSpacing, (value) => {
       this.updateConfig({ grid: { spacing: Math.max(1, value) } }, "grid-spacing", false);
@@ -432,6 +437,9 @@ export class CanvasSettingsPanel {
     if (partial.guidesVisible !== undefined) {
       next.guidesVisible = Boolean(partial.guidesVisible);
     }
+    if (partial.zonesVisible !== undefined) {
+      next.zonesVisible = Boolean(partial.zonesVisible);
+    }
     if (partial.guides !== undefined) {
       next.guides = partial.guides;
     }
@@ -520,6 +528,7 @@ export class CanvasSettingsPanel {
     this.controls.panelSnapToggle.checked = config.grid.snap;
     this.controls.panelRulerToggle.checked = config.rulers;
     this.controls.panelGuidesVisibleToggle.checked = config.guidesVisible;
+    this.controls.panelZonesToggle.checked = config.zonesVisible;
     this.controls.panelGridSpacing.value = round(config.grid.spacing, 2);
     this.controls.panelGridSubdiv.value = config.grid.subdivisions;
 
@@ -808,6 +817,12 @@ export class CanvasSettingsPanel {
       this.zonesLayer.append(rect);
     };
 
+    appendRect("artboard-outline", 0, 0, widthPx, heightPx);
+
+    if (!config.zonesVisible) {
+      return;
+    }
+
     appendRect(
       "zone-bleed",
       -config.bleed.left,
@@ -815,10 +830,20 @@ export class CanvasSettingsPanel {
       widthPx + config.bleed.left + config.bleed.right,
       heightPx + config.bleed.top + config.bleed.bottom,
     );
-
-    appendRect("zone-margin", config.margins.left, config.margins.top, widthPx - config.margins.left - config.margins.right, heightPx - config.margins.top - config.margins.bottom);
-    appendRect("zone-safe", config.safe.left, config.safe.top, widthPx - config.safe.left - config.safe.right, heightPx - config.safe.top - config.safe.bottom);
-    appendRect("artboard-outline", 0, 0, widthPx, heightPx);
+    appendRect(
+      "zone-margin",
+      config.margins.left,
+      config.margins.top,
+      widthPx - config.margins.left - config.margins.right,
+      heightPx - config.margins.top - config.margins.bottom,
+    );
+    appendRect(
+      "zone-safe",
+      config.safe.left,
+      config.safe.top,
+      widthPx - config.safe.left - config.safe.right,
+      heightPx - config.safe.top - config.safe.bottom,
+    );
   }
 
   renderGuides(config) {

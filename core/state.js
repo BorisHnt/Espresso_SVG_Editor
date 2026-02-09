@@ -21,6 +21,7 @@ function createDefaultCanvasConfig() {
     },
     rulers: false,
     guidesVisible: true,
+    zonesVisible: false,
     guides: [],
     margins: { top: 24, right: 24, bottom: 24, left: 24 },
     bleed: { top: 0, right: 0, bottom: 0, left: 0 },
