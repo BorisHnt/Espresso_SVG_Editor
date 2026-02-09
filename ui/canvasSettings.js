@@ -1090,9 +1090,16 @@ export class CanvasSettingsPanel {
     event.stopPropagation();
 
     const config = this.getConfig();
+    const viewportWidth = Math.max(this.viewport.clientWidth, 1);
+    const viewportHeight = Math.max(this.viewport.clientHeight, 1);
+    const unitsPerClientX = config.viewBox.width / viewportWidth;
+    const unitsPerClientY = config.viewBox.height / viewportHeight;
+
     this.resizeDrag = {
       mode,
-      startPoint: this.clientToSvg(event.clientX, event.clientY),
+      startClient: { x: event.clientX, y: event.clientY },
+      unitsPerClientX,
+      unitsPerClientY,
       startWidthPx: toPx(config.width, config.unit, config.dpi),
       startHeightPx: toPx(config.height, config.unit, config.dpi),
       aspectRatio: toPx(config.width, config.unit, config.dpi) / Math.max(1, toPx(config.height, config.unit, config.dpi)),
@@ -1108,9 +1115,10 @@ export class CanvasSettingsPanel {
       if (!this.resizeDrag) {
         return;
       }
-      const point = this.clientToSvg(moveEvent.clientX, moveEvent.clientY);
-      const dx = point.x - this.resizeDrag.startPoint.x;
-      const dy = point.y - this.resizeDrag.startPoint.y;
+      const dxClient = moveEvent.clientX - this.resizeDrag.startClient.x;
+      const dyClient = moveEvent.clientY - this.resizeDrag.startClient.y;
+      const dx = dxClient * this.resizeDrag.unitsPerClientX;
+      const dy = dyClient * this.resizeDrag.unitsPerClientY;
 
       let widthPx = this.resizeDrag.startWidthPx;
       let heightPx = this.resizeDrag.startHeightPx;
