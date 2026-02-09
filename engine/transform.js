@@ -25,10 +25,64 @@ function formatNumber(value) {
   return Number(Number(value).toFixed(2));
 }
 
+function parseNumberToken(value) {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function samePivot(a, b, epsilon = 0.01) {
+  return Math.abs(a.x - b.x) <= epsilon && Math.abs(a.y - b.y) <= epsilon;
+}
+
+function collapseTrailingRotations(transformText, pivot) {
+  let remaining = (transformText || "").trim();
+  let angle = 0;
+  const rotateAtEnd = /(?:^|\s)rotate\(\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)\s*([,\s]+([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)[,\s]+([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?))?\s*\)\s*$/i;
+
+  while (remaining.length) {
+    const match = remaining.match(rotateAtEnd);
+    if (!match) {
+      break;
+    }
+
+    if (!match[3] || !match[4]) {
+      break;
+    }
+
+    const parsedAngle = parseNumberToken(match[1]);
+    const parsedX = parseNumberToken(match[3]);
+    const parsedY = parseNumberToken(match[4]);
+    if (parsedAngle === null || parsedX === null || parsedY === null) {
+      break;
+    }
+
+    if (!samePivot({ x: parsedX, y: parsedY }, pivot)) {
+      break;
+    }
+
+    angle += parsedAngle;
+    remaining = remaining.slice(0, remaining.length - match[0].length).trim();
+  }
+
+  return { remaining, angle };
+}
+
 export function rotateViaTransform(element, angleDeg, cx, cy) {
   const previous = element.getAttribute("transform") || "";
-  const rotate = `rotate(${formatNumber(angleDeg)} ${formatNumber(cx)} ${formatNumber(cy)})`;
-  element.setAttribute("transform", `${previous} ${rotate}`.trim());
+  const pivot = { x: Number(cx), y: Number(cy) };
+  const collapsed = collapseTrailingRotations(previous, pivot);
+  const mergedAngle = collapsed.angle + Number(angleDeg);
+  if (Math.abs(mergedAngle) < 0.0001) {
+    if (collapsed.remaining) {
+      element.setAttribute("transform", collapsed.remaining);
+    } else {
+      element.removeAttribute("transform");
+    }
+    return;
+  }
+  const rotate = `rotate(${formatNumber(mergedAngle)} ${formatNumber(pivot.x)} ${formatNumber(pivot.y)})`;
+  const nextTransform = `${collapsed.remaining} ${rotate}`.trim();
+  element.setAttribute("transform", nextTransform);
 }
 
 export function translateElement(element, dx, dy) {
